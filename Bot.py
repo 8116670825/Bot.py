@@ -37,7 +37,6 @@ BAN_RIGHTS = ChatBannedRights(
 
 async def monitor_voice_chats():
     await client.start()
-    me_id = (await client.get_me()).id
     
     while True:
         try:
@@ -67,22 +66,26 @@ async def monitor_voice_chats():
                         limit=100
                     ))
                     
-                    user_ids = [p.peer.user_id for p in call_participants.participants if hasattr(p.peer, 'user_id') and p.peer.user_id not in admins and p.peer.user_id != me_id]
-                    
-                    if user_ids:
-                        users = await client.get_entity(user_ids)
-                        if not isinstance(users, list):
-                            users = [users]
-                            
-                        ban_tasks = []
-                        for user in users:
-                            if user.bot:
-                                continue
-                            if getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None:
-                                ban_tasks.append(client(EditBannedRequest(chat, user.id, BAN_RIGHTS)))
+                    for participant in call_participants.participants:
+                        try:
+                            user_id = participant.peer.user_id
+                        except AttributeError:
+                            continue
                         
-                        if ban_tasks:
-                            await asyncio.gather(*ban_tasks, return_exceptions=True)
+                        if user_id in admins:
+                            continue
+                        
+                        try:
+                            user = await client.get_entity(user_id)
+                            if user.bot or user.id == (await client.get_me()).id:
+                                continue
+                                
+                            is_premium = getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None
+                            
+                            if is_premium:
+                                await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
+                        except Exception:
+                            pass
                                 
                 except Exception:
                     continue
@@ -90,7 +93,7 @@ async def monitor_voice_chats():
         except Exception:
             pass
             
-        await asyncio.sleep(0.001)
+        await asyncio.sleep(0.05)
 
 def run_bot():
     loop = asyncio.new_event_loop()
@@ -102,4 +105,3 @@ if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-    
