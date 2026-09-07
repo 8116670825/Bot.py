@@ -37,7 +37,7 @@ BAN_RIGHTS = ChatBannedRights(
 
 async def monitor_voice_chats():
     await client.start()
-    print("Userbot started successfully and scanning channel live streams...")
+    me_id = (await client.get_me()).id
     
     while True:
         try:
@@ -67,36 +67,30 @@ async def monitor_voice_chats():
                         limit=100
                     ))
                     
-                    for participant in call_participants.participants:
-                        try:
-                            user_id = participant.peer.user_id
-                        except AttributeError:
-                            continue
-                        
-                        if user_id in admins:
-                            continue
-                        
-                        try:
-                            user = await client.get_entity(user_id)
-                            if user.bot or user.id == (await client.get_me()).id:
-                                continue
-                                
-                            # Check standard premium OR hidden/custom emoji status
-                            is_premium = getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None
+                    user_ids = [p.peer.user_id for p in call_participants.participants if hasattr(p.peer, 'user_id') and p.peer.user_id not in admins and p.peer.user_id != me_id]
+                    
+                    if user_ids:
+                        users = await client.get_entity(user_ids)
+                        if not isinstance(users, list):
+                            users = [users]
                             
-                            if is_premium:
-                                await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
-                                print(f"SUCCESS: Banned Premium user {user_id} in live stream of {chat.title}")
-                        except Exception as e:
-                            print(f"Error processing user {user_id}: {e}")
+                        ban_tasks = []
+                        for user in users:
+                            if user.bot:
+                                continue
+                            if getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None:
+                                ban_tasks.append(client(EditBannedRequest(chat, user.id, BAN_RIGHTS)))
+                        
+                        if ban_tasks:
+                            await asyncio.gather(*ban_tasks, return_exceptions=True)
                                 
-                except Exception as inner_e:
+                except Exception:
                     continue
                     
-        except Exception as e:
-            print(f"Error in monitoring loop: {e}")
+        except Exception:
+            pass
             
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.001)
 
 def run_bot():
     loop = asyncio.new_event_loop()
