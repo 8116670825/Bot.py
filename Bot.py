@@ -20,7 +20,6 @@ def home():
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
-# Banned rights configuration (Updated to fix the error)
 BAN_RIGHTS = ChatBannedRights(
     until_date=None,
     view_messages=False,
@@ -43,25 +42,19 @@ async def monitor_voice_chats():
     
     while True:
         try:
-            # Iterate through all dialogs to find active group chats/channels
             async for dialog in client.iter_dialogs():
                 chat = dialog.entity
                 if not hasattr(chat, "megagroup") or not chat.megagroup:
                     continue
                 
                 try:
-                    # Fetch administrators to protect them
                     admins = {admin.id async for admin in client.iter_participants(chat, filter=ChannelParticipantsAdmins)}
-                    
-                    # Fetch participants in the call/chat
                     participants = await client.get_participants(chat)
                     
                     for user in participants:
-                        # Skip if user is Admin, Owner, or Bot itself
                         if user.id in admins or user.bot:
                             continue
                         
-                        # Check if user has Telegram Premium
                         if getattr(user, "premium", False):
                             try:
                                 await client(EditBannedRequest(chat, user.id, BAN_RIGHTS))
@@ -70,18 +63,23 @@ async def monitor_voice_chats():
                                 print(f"Failed to ban user {user.id}: {e}")
                                 
                 except Exception as inner_e:
-                    # Skip chats where permissions or call details are restricted
                     continue
                     
         except Exception as e:
             print(f"Error in monitoring loop: {e}")
             
-        # Fast polling interval to target performance goal
         await asyncio.sleep(0.05)
 
+def run_bot():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(monitor_voice_chats())
+
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.create_task(monitor_voice_chats())
+    import threading
+    # Run the telethon async loop in a separate background thread so Flask can run freely on the main thread
+    threading.Thread(target=run_bot, daemon=True).start()
+    
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
     
