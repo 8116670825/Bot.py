@@ -20,7 +20,7 @@ def home():
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
-# Banned rights configuration (bans users from speaking, video, and audio in voice chat)
+# Banned rights configuration (Updated to fix the error)
 BAN_RIGHTS = ChatBannedRights(
     until_date=None,
     view_messages=False,
@@ -34,8 +34,7 @@ BAN_RIGHTS = ChatBannedRights(
     send_polls=True,
     change_info=False,
     invite_users=False,
-    pin_messages=False,
-    manage_call=True
+    pin_messages=False
 )
 
 async def monitor_voice_chats():
@@ -51,13 +50,10 @@ async def monitor_voice_chats():
                     continue
                 
                 try:
-                    # Fetch current participants in the voice chat / call
-                    full_chat = await client.get_entity(chat)
                     # Fetch administrators to protect them
                     admins = {admin.id async for admin in client.iter_participants(chat, filter=ChannelParticipantsAdmins)}
                     
-                    # Quick polling of participants in the call
-                    # Note: Using GetParticipantRequest logic loop for real-time tracking
+                    # Fetch participants in the call/chat
                     participants = await client.get_participants(chat)
                     
                     for user in participants:
@@ -80,7 +76,7 @@ async def monitor_voice_chats():
         except Exception as e:
             print(f"Error in monitoring loop: {e}")
             
-        # Fast polling interval to target the 0.1s performance goal
+        # Fast polling interval to target performance goal
         await asyncio.sleep(0.05)
 
 if __name__ == "__main__":
