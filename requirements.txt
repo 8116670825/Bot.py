@@ -1,2 +1,4 @@
 telethon
 flask
+pyaes
+rsa
