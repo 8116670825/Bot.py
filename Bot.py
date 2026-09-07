@@ -37,7 +37,6 @@ BAN_RIGHTS = ChatBannedRights(
 
 async def monitor_voice_chats():
     await client.start()
-    print("Userbot started successfully and scanning channel live streams...")
     
     while True:
         try:
@@ -81,20 +80,18 @@ async def monitor_voice_chats():
                             if user.bot or user.id == (await client.get_me()).id:
                                 continue
                                 
-                            # Check standard premium OR hidden/custom emoji status
                             is_premium = getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None
                             
                             if is_premium:
                                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
-                                print(f"SUCCESS: Banned Premium user {user_id} in live stream of {chat.title}")
-                        except Exception as e:
-                            print(f"Error processing user {user_id}: {e}")
+                        except Exception:
+                            pass
                                 
-                except Exception as inner_e:
+                except Exception:
                     continue
                     
-        except Exception as e:
-            print(f"Error in monitoring loop: {e}")
+        except Exception:
+            pass
             
         await asyncio.sleep(0.05)
 
@@ -108,3 +105,4 @@ if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+    
