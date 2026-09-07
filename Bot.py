@@ -21,7 +21,7 @@ client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 BAN_RIGHTS = ChatBannedRights(
     until_date=None,
-    view_messages=False,
+    view_messages=True,
     send_messages=True,
     send_media=True,
     send_stickers=True,
@@ -44,7 +44,6 @@ async def monitor_voice_chats():
             async for dialog in client.iter_dialogs():
                 chat = dialog.entity
                 
-                # Check for Channels or Megagroups that can host live streams
                 is_channel = getattr(chat, "broadcast", False)
                 is_megagroup = getattr(chat, "megagroup", False)
                 
@@ -52,17 +51,14 @@ async def monitor_voice_chats():
                     continue
                 
                 try:
-                    # Fetch full details of the channel/group to find active live stream / call
                     full_chat = await client(GetFullChannelRequest(chat))
                     call = full_chat.full_chat.call
                     
                     if not call:
-                        continue # No active live stream right now
+                        continue 
                     
-                    # Fetch admins to protect them
                     admins = {admin.id async for admin in client.iter_participants(chat, filter=ChannelParticipantsAdmins)}
                     
-                    # Fetch participants inside the live stream
                     call_participants = await client(GetGroupParticipantsRequest(
                         call=call,
                         ids=[],
@@ -72,23 +68,27 @@ async def monitor_voice_chats():
                     ))
                     
                     for participant in call_participants.participants:
-                        user_id = participant.peer.user_id
+                        try:
+                            user_id = participant.peer.user_id
+                        except AttributeError:
+                            continue
                         
-                        # Skip if user is Admin or Owner
                         if user_id in admins:
                             continue
                         
-                        # Fetch user details to check Telegram Premium status
-                        user = await client.get_entity(user_id)
-                        if user.bot:
-                            continue
+                        try:
+                            user = await client.get_entity(user_id)
+                            if user.bot or user.id == (await client.get_me()).id:
+                                continue
+                                
+                            # Check standard premium OR hidden/custom emoji status
+                            is_premium = getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None
                             
-                        if getattr(user, "premium", False):
-                            try:
+                            if is_premium:
                                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
-                                print(f"Banned Premium user {user_id} in live stream of {chat.title}")
-                            except Exception as e:
-                                print(f"Failed to ban user {user_id}: {e}")
+                                print(f"SUCCESS: Banned Premium user {user_id} in live stream of {chat.title}")
+                        except Exception as e:
+                            print(f"Error processing user {user_id}: {e}")
                                 
                 except Exception as inner_e:
                     continue
