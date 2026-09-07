@@ -41,7 +41,7 @@ async def monitor_voice_chats():
     
     while True:
         try:
-            async for dialog in client.iter_dialogs():
+            async for dialog in client.iter_dialogs(limit=3):
                 chat = dialog.entity
                 
                 is_channel = getattr(chat, "broadcast", False)
@@ -58,13 +58,14 @@ async def monitor_voice_chats():
                         continue 
                     
                     admins = {admin.id async for admin in client.iter_participants(chat, filter=ChannelParticipantsAdmins)}
+                    admins.add(me.id)
                     
                     call_participants = await client(GetGroupParticipantsRequest(
                         call=call,
                         ids=[],
                         sources=[],
                         offset='',
-                        limit=200
+                        limit=100
                     ))
                     
                     for participant in call_participants.participants:
@@ -73,7 +74,7 @@ async def monitor_voice_chats():
                         except AttributeError:
                             continue
                         
-                        if user_id in admins or user_id == me.id:
+                        if user_id in admins:
                             continue
                         
                         try:
@@ -94,8 +95,7 @@ async def monitor_voice_chats():
         except Exception:
             pass
             
-        # समय को घटाकर बहुत कम कर दिया गया है ताकि यह तुरंत डिटेक्ट करे
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.05)
 
 def run_bot():
     loop = asyncio.new_event_loop()
