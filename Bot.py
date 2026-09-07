@@ -1,16 +1,20 @@
 import os
-from telethon import TelegramClient, events
+import threading
 from flask import Flask
+from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 
-# Flask ऐप रेंडर (Render) को जिंदा रखने के लिए
+# रेंडर की फ्री वेब सर्विस को एक्टिव रखने के लिए Flask ऐप
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "Userbot is running!"
+    return "Telegram Userbot is running 24/7 successfully!"
 
 def run():
-    app.run(host='0.5.0.0', port=int(os.environ.get('PORT', 8080)))
+    # रेंडर द्वारा दिए गए पोर्ट का उपयोग करना
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
 
 # क्रेडेंशियल्स
 api_id = 32815595
@@ -19,26 +23,24 @@ session_string = os.environ.get('SESSION_STRING')
 
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 
-# वॉयस चैट में प्रीमियम यूजर को बैन करने का लॉजिक
+# वॉयस चैट / ग्रुप में प्रीमियम यूजर को ऑटो-बैन करने का लॉजिक
 @client.on(events.ChatAction)
 async def handler(event):
     if event.user_joined or event.user_added:
         user = await event.get_user()
-        # यदि यूजर प्रीमियम है (ध्यान दें: टेलीथॉन में प्रीमियम चेक करने का तरीका)
         if getattr(user, 'premium', False):
             try:
-                # वॉयस चैट / ग्रुप से बैन करना
                 await client.edit_admin(event.chat_id, user.id, ban_users=True)
                 print(f"Banned premium user: {user.id}")
             except Exception as e:
                 print(f"Error banning user: {e}")
 
 if __name__ == '__main__':
-    import threading
-    from telethon.sessions import StringSession
-    
+    # वेब सर्वर को अलग धागे (Thread) में चलाना ताकि बॉट के साथ कोई रुकावट न आए
     t = threading.Thread(target=run)
     t.start()
     
+    # यूजरबॉट को स्टार्ट करना
     client.start()
     client.run_until_disconnected()
+    
