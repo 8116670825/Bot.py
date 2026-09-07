@@ -37,6 +37,7 @@ BAN_RIGHTS = ChatBannedRights(
 
 async def monitor_voice_chats():
     await client.start()
+    me = await client.get_me()
     
     while True:
         try:
@@ -63,7 +64,7 @@ async def monitor_voice_chats():
                         ids=[],
                         sources=[],
                         offset='',
-                        limit=100
+                        limit=200
                     ))
                     
                     for participant in call_participants.participants:
@@ -72,12 +73,12 @@ async def monitor_voice_chats():
                         except AttributeError:
                             continue
                         
-                        if user_id in admins:
+                        if user_id in admins or user_id == me.id:
                             continue
                         
                         try:
                             user = await client.get_entity(user_id)
-                            if user.bot or user.id == (await client.get_me()).id:
+                            if user.bot:
                                 continue
                                 
                             is_premium = getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None
@@ -93,7 +94,8 @@ async def monitor_voice_chats():
         except Exception:
             pass
             
-        await asyncio.sleep(0.05)
+        # समय को घटाकर बहुत कम कर दिया गया है ताकि यह तुरंत डिटेक्ट करे
+        await asyncio.sleep(0.2)
 
 def run_bot():
     loop = asyncio.new_event_loop()
