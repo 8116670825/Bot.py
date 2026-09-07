@@ -3,15 +3,14 @@ import asyncio
 from flask import Flask
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from telethon.tl.functions.channels import EditBannedRequest
+from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequest
+from telethon.tl.functions.phone import GetGroupParticipantsRequest
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
 
-# Credentials
 API_ID = 32815595
 API_HASH = "4f8710ec9e88946139ac688af9eb1f5b"
 SESSION_STRING = os.getenv("SESSION_STRING")
 
-# Flask server to keep Render web service alive
 app = Flask(__name__)
 
 @app.route("/")
@@ -38,29 +37,58 @@ BAN_RIGHTS = ChatBannedRights(
 
 async def monitor_voice_chats():
     await client.start()
-    print("Userbot started successfully and scanning active voice chats...")
+    print("Userbot started successfully and scanning channel live streams...")
     
     while True:
         try:
             async for dialog in client.iter_dialogs():
                 chat = dialog.entity
-                if not hasattr(chat, "megagroup") or not chat.megagroup:
+                
+                # Check for Channels or Megagroups that can host live streams
+                is_channel = getattr(chat, "broadcast", False)
+                is_megagroup = getattr(chat, "megagroup", False)
+                
+                if not (is_channel or is_megagroup):
                     continue
                 
                 try:
-                    admins = {admin.id async for admin in client.iter_participants(chat, filter=ChannelParticipantsAdmins)}
-                    participants = await client.get_participants(chat)
+                    # Fetch full details of the channel/group to find active live stream / call
+                    full_chat = await client(GetFullChannelRequest(chat))
+                    call = full_chat.full_chat.call
                     
-                    for user in participants:
-                        if user.id in admins or user.bot:
+                    if not call:
+                        continue # No active live stream right now
+                    
+                    # Fetch admins to protect them
+                    admins = {admin.id async for admin in client.iter_participants(chat, filter=ChannelParticipantsAdmins)}
+                    
+                    # Fetch participants inside the live stream
+                    call_participants = await client(GetGroupParticipantsRequest(
+                        call=call,
+                        ids=[],
+                        sources=[],
+                        offset='',
+                        limit=100
+                    ))
+                    
+                    for participant in call_participants.participants:
+                        user_id = participant.peer.user_id
+                        
+                        # Skip if user is Admin or Owner
+                        if user_id in admins:
                             continue
                         
+                        # Fetch user details to check Telegram Premium status
+                        user = await client.get_entity(user_id)
+                        if user.bot:
+                            continue
+                            
                         if getattr(user, "premium", False):
                             try:
-                                await client(EditBannedRequest(chat, user.id, BAN_RIGHTS))
-                                print(f"Banned Premium user {user.id} in chat {chat.title}")
+                                await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
+                                print(f"Banned Premium user {user_id} in live stream of {chat.title}")
                             except Exception as e:
-                                print(f"Failed to ban user {user.id}: {e}")
+                                print(f"Failed to ban user {user_id}: {e}")
                                 
                 except Exception as inner_e:
                     continue
@@ -77,9 +105,7 @@ def run_bot():
 
 if __name__ == "__main__":
     import threading
-    # Run the telethon async loop in a separate background thread so Flask can run freely on the main thread
     threading.Thread(target=run_bot, daemon=True).start()
-    
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
     
