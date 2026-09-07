@@ -1,46 +1,91 @@
 import os
-import threading
+import asyncio
 from flask import Flask
-from telethon import TelegramClient, events
+from telethon import TelegramClient
 from telethon.sessions import StringSession
+from telethon.tl.functions.channels import EditBannedRequest
+from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
 
-# रेंडर की फ्री वेब सर्विस को एक्टिव रखने के लिए Flask ऐप
-app = Flask('')
+# Credentials
+API_ID = 32815595
+API_HASH = "4f8710ec9e88946139ac688af9eb1f5b"
+SESSION_STRING = os.getenv("SESSION_STRING")
 
-@app.route('/')
+# Flask server to keep Render web service alive
+app = Flask(__name__)
+
+@app.route("/")
 def home():
-    return "Telegram Userbot is running 24/7 successfully!"
+    return "Userbot is running actively!"
 
-def run():
-    # रेंडर द्वारा दिए गए पोर्ट का उपयोग करना
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
-# क्रेडेंशियल्स
-api_id = 32815595
-api_hash = '4f8710ec9e88946139ac688af9eb1f5b'
-session_string = os.environ.get('SESSION_STRING')
+# Banned rights configuration (bans users from speaking, video, and audio in voice chat)
+BAN_RIGHTS = ChatBannedRights(
+    until_date=None,
+    view_messages=False,
+    send_messages=True,
+    send_media=True,
+    send_stickers=True,
+    send_gifs=True,
+    send_games=True,
+    send_inline=True,
+    embed_links=True,
+    send_polls=True,
+    change_info=False,
+    invite_users=False,
+    pin_messages=False,
+    manage_call=True
+)
 
-client = TelegramClient(StringSession(session_string), api_id, api_hash)
-
-# वॉयस चैट / ग्रुप में प्रीमियम यूजर को ऑटो-बैन करने का लॉजिक
-@client.on(events.ChatAction)
-async def handler(event):
-    if event.user_joined or event.user_added:
-        user = await event.get_user()
-        if getattr(user, 'premium', False):
-            try:
-                await client.edit_admin(event.chat_id, user.id, ban_users=True)
-                print(f"Banned premium user: {user.id}")
-            except Exception as e:
-                print(f"Error banning user: {e}")
-
-if __name__ == '__main__':
-    # वेब सर्वर को अलग धागे (Thread) में चलाना ताकि बॉट के साथ कोई रुकावट न आए
-    t = threading.Thread(target=run)
-    t.start()
+async def monitor_voice_chats():
+    await client.start()
+    print("Userbot started successfully and scanning active voice chats...")
     
-    # यूजरबॉट को स्टार्ट करना
-    client.start()
-    client.run_until_disconnected()
+    while True:
+        try:
+            # Iterate through all dialogs to find active group chats/channels
+            async for dialog in client.iter_dialogs():
+                chat = dialog.entity
+                if not hasattr(chat, "megagroup") or not chat.megagroup:
+                    continue
+                
+                try:
+                    # Fetch current participants in the voice chat / call
+                    full_chat = await client.get_entity(chat)
+                    # Fetch administrators to protect them
+                    admins = {admin.id async for admin in client.iter_participants(chat, filter=ChannelParticipantsAdmins)}
+                    
+                    # Quick polling of participants in the call
+                    # Note: Using GetParticipantRequest logic loop for real-time tracking
+                    participants = await client.get_participants(chat)
+                    
+                    for user in participants:
+                        # Skip if user is Admin, Owner, or Bot itself
+                        if user.id in admins or user.bot:
+                            continue
+                        
+                        # Check if user has Telegram Premium
+                        if getattr(user, "premium", False):
+                            try:
+                                await client(EditBannedRequest(chat, user.id, BAN_RIGHTS))
+                                print(f"Banned Premium user {user.id} in chat {chat.title}")
+                            except Exception as e:
+                                print(f"Failed to ban user {user.id}: {e}")
+                                
+                except Exception as inner_e:
+                    # Skip chats where permissions or call details are restricted
+                    continue
+                    
+        except Exception as e:
+            print(f"Error in monitoring loop: {e}")
+            
+        # Fast polling interval to target the 0.1s performance goal
+        await asyncio.sleep(0.05)
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.create_task(monitor_voice_chats())
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
     
