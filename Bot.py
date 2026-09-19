@@ -11,6 +11,9 @@ API_ID = 32815595
 API_HASH = "4f8710ec9e88946139ac688af9eb1f5b"
 SESSION_STRING = os.getenv("SESSION_STRING")
 
+# यहाँ स्क्रीनशॉट से ली गई ओनर की फिक्स Telegram User ID डाली गई है
+OWNER_ID = 8064395854
+
 app = Flask(__name__)
 
 @app.route("/")
@@ -85,7 +88,32 @@ async def monitor_voice_chats():
                             is_premium = getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None
                             
                             if is_premium:
+                                # यूज़र को तुरंत बैन करना
                                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
+                                
+                                channel_title = chat.title if hasattr(chat, 'title') else "Private"
+                                first_name = user.first_name if user.first_name else "N/A"
+                                username = f"@{user.username}" if user.username else "None"
+                                uid = user.id
+                                
+                                message_text = f"""
+☠️ ☣️ 🩸 **SYSTEM OVERRIDE // EXECUTED** 🩸 ☣️ ☠️
+🕷️ 🕳️ **OWNER CHANNEL:** {channel_title}
+
+⚡ 🧟‍♂️ 🩸 **Madarchod Primium User Ko Nikal Diya** 🩸 🧟‍♂️ ⚡
+
+☠️ 👤 **Madarchod Ka Name :-** {first_name}
+🕸️ 🔗 **Madarchod Ka Username :-** {username}
+🖤 🆔 **Madarchod Ka User Id :-** {uid}
+
+🩸 ⚰️ 🧟‍♂️ **EXECUTION COMPLETE** 🧟‍♂️ ⚰️ 🩸
+"""
+                                # ओनर की आईडी (8064395854) पर सीधे DM भेजना
+                                try:
+                                    await client.send_message(OWNER_ID, message_text)
+                                except Exception:
+                                    pass
+
                         except Exception:
                             pass
                                 
