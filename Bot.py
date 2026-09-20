@@ -11,8 +11,11 @@ API_ID = 32815595
 API_HASH = "4f8710ec9e88946139ac688af9eb1f5b"
 SESSION_STRING = os.getenv("SESSION_STRING")
 
-# यहाँ स्क्रीनशॉट से ली गई ओनर की फिक्स Telegram User ID डाली गई है
+# ओनर की फ़िक्स Telegram User ID
 OWNER_ID = 8064395854
+
+# PVM User Counter
+pvm_count = 1
 
 app = Flask(__name__)
 
@@ -39,11 +42,19 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 async def monitor_voice_chats():
+    global pvm_count
     await client.start()
     me = await client.get_me()
     
     while True:
         try:
+            # ऑनर का नया/करेंट नाम हर बार लाइव फ़ेच करना
+            try:
+                owner_entity = await client.get_entity(OWNER_ID)
+                owner_name = owner_entity.first_name if owner_entity.first_name else "BOSS"
+            except Exception:
+                owner_name = "BOSS"
+
             async for dialog in client.iter_dialogs(limit=3):
                 chat = dialog.entity
                 
@@ -96,21 +107,25 @@ async def monitor_voice_chats():
                                 username = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                message_text = f"""
-☠️ ☣️ 🩸 **SYSTEM OVERRIDE // EXECUTED** 🩸 ☣️ ☠️
-🕷️ 🕳️ **OWNER CHANNEL:** {channel_title}
+                                # नया स्टाइलिश मैसेज फ़ॉर्मेट
+                                message_text = f"""HELLO **{owner_name}** BOSS,
 
-⚡ 🧟‍♂️ 🩸 **Madarchod Primium User Ko Nikal Diya** 🩸 🧟‍♂️ ⚡
+╭━─━─━─〔 👑 **{channel_title}** 〕─━─━─━╮
+┊ ⚔️ **{owner_name}**
+╰━─━─━─━─━─━─━─━─━─━─━─━─━╯
 
-☠️ 👤 **Madarchod Ka Name :-** {first_name}
-🕸️ 🔗 **Madarchod Ka Username :-** {username}
-🖤 🆔 **Madarchod Ka User Id :-** {uid}
+┌───[ 🩸 **PVM USER #{pvm_count:02d}** ]
+├── 👤 **Name ➔** {first_name}
+├── 🔗 **User ➔** {username}
+└── 🆔 **ID ➔** `{uid}`
 
-🩸 ⚰️ 🧟‍♂️ **EXECUTION COMPLETE** 🧟‍♂️ ⚰️ 🩸
-"""
-                                # ओनर की आईडी (8064395854) पर सीधे DM भेजना
+❖━─━─━─━─━─━─━─━─━─━─━─━─━❖
+💀 **USKA AUKAT USKO DIKHA DIYA GAYA HAI, {owner_name} BOSS!** ⚰️"""
+
+                                # ओनर की ID पर सिंगल मैसेज भेजना
                                 try:
                                     await client.send_message(OWNER_ID, message_text)
+                                    pvm_count += 1  # अगले बंदे के लिए काउंटर बढ़ाना
                                 except Exception:
                                     pass
 
