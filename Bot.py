@@ -75,21 +75,28 @@ async def kriti_wife_reply(event):
             await event.reply("Arey suno na EnZo ji, Render me GEMINI_API_KEY set kar do! ❤️")
         return
 
-    try:
-        # Dynamic Generative Model call without global session lock
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=kriti_wife_instruction
-        )
-        response = model.generate_content(user_text)
-        
-        if response and response.text:
-            await event.reply(response.text)
-    except Exception as e:
-        print(f"AI Error Logs: {e}")
-        # Real error message so you know exact reason instead of same loop
+    # Try supported model names dynamically
+    model_names = ["gemini-2.5-flash", "gemini-1.5-flash-latest", "gemini-pro"]
+    response_text = None
+
+    for model_name in model_names:
+        try:
+            model = genai.GenerativeModel(
+                model_name=model_name,
+                system_instruction=kriti_wife_instruction
+            )
+            response = model.generate_content(user_text)
+            if response and response.text:
+                response_text = response.text
+                break
+        except Exception:
+            continue
+
+    if response_text:
+        await event.reply(response_text)
+    else:
         if event.sender_id == HUSBAND_OWNER_ID:
-            await event.reply(f"Arey EnZo jaan, AI error aa raha hai: `{e}` ❤️")
+            await event.reply("Arey EnZo jaan, Gemini API Key kaam nahi kar rahi, please new key update karo! ❤️")
 
 # ==========================================
 # 🎤 2. VOICE CHAT PREMIUM BANNER TASK
