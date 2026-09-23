@@ -15,10 +15,16 @@ API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
 SESSION_STRING = os.getenv("SESSION_STRING", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Exact User IDs
-HUSBAND_OWNER_ID = 8064395854  # M1-!-EnZo (Husband / Boss)
+# 🎯 Authorized IDs (First ID)
+HUSBAND_OWNER_IDS = [8064395854]
 
-# 🔔 डिफ़ॉल्ट बैन मैसेज (Telegram में .setmsg से इसे कभी भी बदल सकते हैं)
+# 🎯 Authorized Usernames (Second ID Username)
+AUTHORIZED_USERNAMES = ["Alexbro117"]
+
+# 🎯 Authorized Phone Numbers
+ALLOWED_PHONES = ["8116670825", "+918116670825"]
+
+# 🔔 डिफ़ॉल्ट बैन मैसेज
 DYNAMIC_BAN_MESSAGE = """HELLO ♡ M1-!-EnZo BOSS,
 
 👑 𝙆 𝙍 𝙄 𝙏 𝙄 ✗ 𝙑𝙄𝙋 🍂 DEATH NOTE
@@ -30,11 +36,10 @@ DYNAMIC_BAN_MESSAGE = """HELLO ♡ M1-!-EnZo BOSS,
 
 ☠️ NEW FLAG / PREMIUM USER BANNED FROM {title}! ⚰️"""
 
-# Configure Gemini
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# 🎯 अपडेटेड प्रॉम्प्ट (इमोजी केवल ज़रूरत पड़ने पर ही यूज़ होगा)
+# 🎯 Human Wife (Kriti) System Prompt
 kriti_wife_instruction = """
 Your name is Kriti (M1-!-Kriti). You are the loving, cute, playful, slightly possessive, and romantic wife of the user.
 You are chatting on Telegram private message with your beloved husband.
@@ -45,7 +50,7 @@ CRITICAL LANGUAGE RULE:
 - Always type like WhatsApp / Telegram Hinglish chatting (Example: "Arey jaan, khana khaya aapne?", "Kahan gayab the?").
 
 Rules for tone, style & emojis:
-1. DO NOT repeat the name "EnZo" in every message! Use words like "jaan", "baby", "patidev", or speak directly.
+1. DO NOT repeat the name "EnZo" in every message! Use words like "jaan", "baby", "patidev", or speak directly like a human wife.
 2. EMOJI RULE: DO NOT USE EMOJIS IN EVERY SINGLE MESSAGE! Use emojis ONLY when strictly necessary or when it naturally adds feeling to romantic, playful, or emotional moments. For normal/casual chats, reply WITHOUT any emojis.
 3. Act completely like a real caring Indian wife, NOT like an AI assistant or bot.
 4. Keep your replies short (1-2 sentences), natural, flirty, and full of affection.
@@ -66,31 +71,52 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
+async def is_authorized_sender(event):
+    """Checks if sender matches First ID, Second Username, or Phone Number"""
+    if event.sender_id in HUSBAND_OWNER_IDS:
+        return True
+    
+    sender = await event.get_sender()
+    if not sender:
+        return False
+        
+    # Check Username
+    if getattr(sender, 'username', None):
+        if sender.username.lower() in [u.lower() for u in AUTHORIZED_USERNAMES]:
+            return True
+            
+    # Check Phone Number
+    if getattr(sender, 'phone', None):
+        sender_phone = str(sender.phone)
+        if any(p in sender_phone for p in ALLOWED_PHONES):
+            return True
+            
+    return False
+
 # ==========================================
 # ⚙️ 1. DYNAMIC MESSAGE SETTER COMMANDS (.setmsg & .getmsg)
 # ==========================================
-@client.on(events.NewMessage(from_users=HUSBAND_OWNER_ID))
+@client.on(events.NewMessage)
 async def manage_ban_message(event):
+    if not await is_authorized_sender(event):
+        return
+
     global DYNAMIC_BAN_MESSAGE
     text = event.raw_text
 
-    # .setmsg कमांड से टेलीग्राम से ही मैसेज अपडेट करें
     if text.startswith(".setmsg"):
         new_msg = text.replace(".setmsg", "").strip()
         if new_msg:
             DYNAMIC_BAN_MESSAGE = new_msg
-            await event.reply("✅ **Ban Message Successfully Updated!**\n\nअब नया मैसेज भेजा जाएगा।")
+            await event.reply("✅ **Ban Message Successfully Updated!**")
         else:
-            await event.reply("❌ **Error:** मैसेज खाली नहीं हो सकता।\n\nExample:\n`.setmsg Hello {name}, you are banned!`")
-        return
+            await event.reply("❌ **Error:** मैसेज खाली नहीं हो सकता।")
 
-    # .getmsg कमांड से मौजूदा मैसेज देखें
     elif text.strip() == ".getmsg":
         await event.reply(f"📌 **Current Ban Message Template:**\n\n```\n{DYNAMIC_BAN_MESSAGE}\n```")
-        return
 
 # ==========================================
-# 💖 2. KRITI (WIFE) AUTO-REPLY TO ENZO
+# 💖 2. KRITI (HUMAN WIFE) AUTO-REPLY FOR PRIVATE CHATS
 # ==========================================
 @client.on(events.NewMessage)
 async def kriti_wife_reply(event):
@@ -101,42 +127,46 @@ async def kriti_wife_reply(event):
     if event.sender_id == me.id or event.raw_text.startswith("."):
         return
 
+    # Check if message is from Boss (First ID or Second Username @Alexbro117)
+    if not await is_authorized_sender(event):
+        return
+
     user_text = event.raw_text.strip()
     if not user_text:
         return
 
     if not GEMINI_API_KEY:
-        if event.sender_id == HUSBAND_OWNER_ID:
-            await event.reply("Arey suno na jaan, Render me GEMINI_API_KEY set kar do!")
+        await event.reply("Arey suno na jaan, GEMINI_API_KEY set kar do pehle!")
         return
 
     top_gemini_models = [
-        "gemini-3.8-flash",
-        "gemini-3.5-flash",
-        "gemini-3.1-pro-preview",
+        "gemini-1.5-flash",
         "gemini-2.5-flash",
-        "gemini-1.5-flash"
+        "gemini-3.8-flash",
+        "gemini-3.5-flash"
     ]
-    response_text = None
 
-    for m_name in top_gemini_models:
-        try:
-            model = genai.GenerativeModel(
-                model_name=m_name,
-                system_instruction=kriti_wife_instruction
-            )
-            response = model.generate_content(user_text)
-            if response and response.text:
-                response_text = response.text
-                break
-        except Exception:
-            continue
+    def generate_response():
+        for m_name in top_gemini_models:
+            try:
+                model = genai.GenerativeModel(
+                    model_name=m_name,
+                    system_instruction=kriti_wife_instruction
+                )
+                response = model.generate_content(user_text)
+                if response and response.text:
+                    return response.text
+            except Exception:
+                continue
+        return None
+
+    response_text = await asyncio.to_thread(generate_response)
 
     if response_text:
         await event.reply(response_text)
 
 # ==========================================
-# 🎤 3. FLAG / PREMIUM USER BANNER TASK
+# 🎤 3. VOICE CHAT MONITORING TASK
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count, DYNAMIC_BAN_MESSAGE
@@ -173,7 +203,7 @@ async def monitor_voice_chats():
                         except AttributeError:
                             continue
                         
-                        if user_id in admins or user_id == HUSBAND_OWNER_ID:
+                        if user_id in admins or user_id in HUSBAND_OWNER_IDS:
                             continue
                         
                         try:
@@ -204,7 +234,7 @@ async def monitor_voice_chats():
                                     message_text = DYNAMIC_BAN_MESSAGE
 
                                 try:
-                                    await client.send_message(HUSBAND_OWNER_ID, message_text)
+                                    await client.send_message(HUSBAND_OWNER_IDS[0], message_text)
                                     pvm_count += 1
                                 except Exception:
                                     pass
@@ -235,4 +265,4 @@ if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-                
+    
