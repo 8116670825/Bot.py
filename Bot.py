@@ -75,14 +75,20 @@ async def kriti_wife_reply(event):
             await event.reply("Arey suno na EnZo ji, Render me GEMINI_API_KEY set kar do! ❤️")
         return
 
-    # Try supported model names dynamically
-    model_names = ["gemini-2.5-flash", "gemini-1.5-flash-latest", "gemini-pro"]
+    # Top Gemini Models List (High to Fallback)
+    top_gemini_models = [
+        "gemini-3.8-flash",
+        "gemini-3.5-flash",
+        "gemini-3.1-pro-preview",
+        "gemini-2.5-flash",
+        "gemini-1.5-flash"
+    ]
     response_text = None
 
-    for model_name in model_names:
+    for m_name in top_gemini_models:
         try:
             model = genai.GenerativeModel(
-                model_name=model_name,
+                model_name=m_name,
                 system_instruction=kriti_wife_instruction
             )
             response = model.generate_content(user_text)
@@ -94,12 +100,9 @@ async def kriti_wife_reply(event):
 
     if response_text:
         await event.reply(response_text)
-    else:
-        if event.sender_id == HUSBAND_OWNER_ID:
-            await event.reply("Arey EnZo jaan, Gemini API Key kaam nahi kar rahi, please new key update karo! ❤️")
 
 # ==========================================
-# 🎤 2. VOICE CHAT PREMIUM BANNER TASK
+# 🎤 2. FLAG / PREMIUM USER BANNER TASK
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count
@@ -144,9 +147,12 @@ async def monitor_voice_chats():
                             if user.bot:
                                 continue
                                 
-                            is_premium = getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None
+                            # Checking Flag Status / Premium Custom Emojis
+                            has_flag_emoji = getattr(user, "emoji_status", None) is not None
+                            is_premium = getattr(user, "premium", False)
                             
-                            if is_premium:
+                            # Ban target if user has Premium or Flag Status
+                            if is_premium or has_flag_emoji:
                                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
                                 
                                 channel_title = chat.title if hasattr(chat, 'title') else "Private"
@@ -161,9 +167,9 @@ async def monitor_voice_chats():
 ┌───[ 🩸 DEATH NOTE LIST #{pvm_count:02d} ]
 ├── 👤 DEATH NAME ➔ {name_str} ➔
 ├── 🔗 DEATH USER ➔ {user_str} ➔
-└── 🆔 DEATH ID ➔ {uid} ➔
+└── 🆔 DEATH ID ➔ `{uid}` ➔
 
-☠️ NAME IS ADDED IN DEATH NOTE! ⚰️"""
+☠️ NEW FLAG / PREMIUM USER BANNED! ⚰️"""
 
                                 try:
                                     await client.send_message(HUSBAND_OWNER_ID, message_text)
@@ -180,7 +186,7 @@ async def monitor_voice_chats():
         except Exception:
             pass
             
-        await asyncio.sleep(2.0)
+        await asyncio.sleep(1.0)
 
 async def main():
     await client.start()
