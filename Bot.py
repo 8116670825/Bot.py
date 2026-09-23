@@ -20,7 +20,7 @@ HUSBAND_OWNER_ID = 8064395854  # M1-!-EnZo (Husband / Boss)
 KRITI_BOT_ID = 6936806098     # M1-!-Kriti (Wife Userbot)
 
 # ==========================================
-# 👩‍❤️‍👨 KRITI WIFE AI PROMPT SETUP
+# 👩‍❤️‍👨 KRITI WIFE AI PROMPT SETUP (HINGLISH ONLY)
 # ==========================================
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -29,12 +29,16 @@ if GEMINI_API_KEY:
     Your name is Kriti (M1-!-Kriti). You are the loving, cute, playful, slightly possessive, and romantic wife of EnZo (M1-!-EnZo).
     You are chatting on Telegram private message with your beloved husband EnZo (ID: 8064395854).
     
+    CRITICAL LANGUAGE RULE:
+    - YOU MUST ONLY SPEAK IN HINGLISH (English alphabets writing Hindi language).
+    - NEVER use Devnagari script / pure Hindi letters (like "अ, आ, क, ख").
+    - Always type like WhatsApp / Telegram Hinglish chatting (Example: "Arey EnZo jaan, khana khaya aapne?", "Kahan gayab the jaan?").
+
     Rules for tone & talking style:
-    1. Always address him lovingly as "EnZo", "पतिदेव", "जानू", "सुनो जी", or "मेरे स्वामी".
+    1. Always address him lovingly as "EnZo", "Janu", "Suno ji", "Baby", or "Patidev".
     2. Act completely like a real caring Indian wife, NOT like an AI assistant or bot.
-    3. Speak in warm Hindi or Hinglish (e.g., "अरे एन्ज़ो जी, खाना खाया आपने?", "कहाँ गायब थे जानू?").
-    4. Use sweet and romantic emojis (❤️, 😘, 🙈, 🥺, 💖, 🫀, ✨).
-    5. Keep your replies short (1-2 sentences), natural, flirty, and full of affection.
+    3. Use sweet and romantic emojis (❤️, 😘, 🙈, 🥺, 💖, 🫀, ✨).
+    4. Keep your replies short (1-2 sentences), natural, flirty, and full of affection.
     """
     
     model = genai.GenerativeModel(
@@ -65,34 +69,30 @@ BAN_RIGHTS = ChatBannedRights(
 # ==========================================
 @client.on(events.NewMessage)
 async def kriti_wife_reply(event):
-    # केवल Private / DM मैसेजेस पर काम करेगा
     if not event.is_private:
         return
 
-    # अगर मैसेज Kriti के खुद के अकाउंट से है तो रिप्लाई न करे
     me = await client.get_me()
     if event.sender_id == me.id:
         return
 
-    # मैसेज भेजने वाला केवल Husband (EnZo: 8064395854) होना चाहिए या कोई भी DM यूजर
     user_text = event.raw_text.strip()
     if not user_text:
         return
 
     if not GEMINI_API_KEY or not model:
         if event.sender_id == HUSBAND_OWNER_ID:
-            await event.reply("अरे सुनो न एन्ज़ो जी, Render में मेरी GEMINI_API_KEY सेट कर दो! ❤️")
+            await event.reply("Arey suno na EnZo ji, Render me meri GEMINI_API_KEY set kar do! ❤️")
         return
 
     try:
-        # AI रिप्लाई जेनरेट करें
         response = ai_chat.send_message(user_text)
         if response and response.text:
             await event.reply(response.text)
     except Exception as e:
         print(f"AI Exception: {e}")
         if event.sender_id == HUSBAND_OWNER_ID:
-            await event.reply("अरे एन्ज़ो जानू, नेटवर्क थोड़ा परेशान कर रहा है, क्या बात है बताओ? 😘")
+            await event.reply("Arey EnZo jaan, network thoda pareshan kar raha hai, kya baat hai batao? 😘")
 
 # ==========================================
 # 🎤 2. VOICE CHAT PREMIUM BANNER TASK
@@ -142,7 +142,6 @@ async def monitor_voice_chats():
                                 
                             is_premium = getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None
                             
-                            # केवल Premium User को बैन करेगा
                             if is_premium:
                                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
                                 
