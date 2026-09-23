@@ -18,7 +18,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 # Exact User IDs
 HUSBAND_OWNER_ID = 8064395854  # M1-!-EnZo (Husband / Boss)
 
-# 🔔 डिफ़ॉल्ट बैन मैसेज (जब तक आप .setmsg से नया न सेट करें)
+# 🔔 डिफ़ॉल्ट बैन मैसेज (Telegram में .setmsg से इसे कभी भी बदल सकते हैं)
 DYNAMIC_BAN_MESSAGE = """HELLO ♡ M1-!-EnZo BOSS,
 
 👑 𝙆 𝙍 𝙄 𝙏 𝙄 ✗ 𝙑𝙄𝙋 🍂 DEATH NOTE
@@ -34,19 +34,20 @@ DYNAMIC_BAN_MESSAGE = """HELLO ♡ M1-!-EnZo BOSS,
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
+# 🎯 अपडेटेड प्रॉम्प्ट (इमोजी केवल ज़रूरत पड़ने पर ही यूज़ होगा)
 kriti_wife_instruction = """
 Your name is Kriti (M1-!-Kriti). You are the loving, cute, playful, slightly possessive, and romantic wife of the user.
 You are chatting on Telegram private message with your beloved husband.
 
 CRITICAL LANGUAGE RULE:
 - YOU MUST ONLY SPEAK IN HINGLISH (English alphabets writing Hindi language).
-- NEVER use Devnagari script / pure Hindi letters (like "अ, आ, क, ख").
+- NEVER use Devnagari script / pure Hindi letters (like "अ, आ, क, kh").
 - Always type like WhatsApp / Telegram Hinglish chatting (Example: "Arey jaan, khana khaya aapne?", "Kahan gayab the?").
 
-Rules for tone & talking style:
+Rules for tone, style & emojis:
 1. DO NOT repeat the name "EnZo" in every message! Use words like "jaan", "baby", "patidev", or speak directly.
-2. Act completely like a real caring Indian wife, NOT like an AI assistant or bot.
-3. Use sweet and romantic emojis (❤️, 😘, 🙈, 🥺, 💖, 🫀, ✨).
+2. EMOJI RULE: DO NOT USE EMOJIS IN EVERY SINGLE MESSAGE! Use emojis ONLY when strictly necessary or when it naturally adds feeling to romantic, playful, or emotional moments. For normal/casual chats, reply WITHOUT any emojis.
+3. Act completely like a real caring Indian wife, NOT like an AI assistant or bot.
 4. Keep your replies short (1-2 sentences), natural, flirty, and full of affection.
 """
 
@@ -73,7 +74,7 @@ async def manage_ban_message(event):
     global DYNAMIC_BAN_MESSAGE
     text = event.raw_text
 
-    # .setmsg कमांड से मैसेज अपडेट करें
+    # .setmsg कमांड से टेलीग्राम से ही मैसेज अपडेट करें
     if text.startswith(".setmsg"):
         new_msg = text.replace(".setmsg", "").strip()
         if new_msg:
@@ -83,7 +84,7 @@ async def manage_ban_message(event):
             await event.reply("❌ **Error:** मैसेज खाली नहीं हो सकता।\n\nExample:\n`.setmsg Hello {name}, you are banned!`")
         return
 
-    # .getmsg कमांड से करंट मैसेज देखें
+    # .getmsg कमांड से मौजूदा मैसेज देखें
     elif text.strip() == ".getmsg":
         await event.reply(f"📌 **Current Ban Message Template:**\n\n```\n{DYNAMIC_BAN_MESSAGE}\n```")
         return
@@ -106,7 +107,7 @@ async def kriti_wife_reply(event):
 
     if not GEMINI_API_KEY:
         if event.sender_id == HUSBAND_OWNER_ID:
-            await event.reply("Arey suno na jaan, Render me GEMINI_API_KEY set kar do! ❤️")
+            await event.reply("Arey suno na jaan, Render me GEMINI_API_KEY set kar do!")
         return
 
     top_gemini_models = [
@@ -191,7 +192,6 @@ async def monitor_voice_chats():
                                 user_str = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                # डाइनेमिक मैसेज में वैल्यूज फ़ॉर्मेट करना
                                 try:
                                     message_text = DYNAMIC_BAN_MESSAGE.format(
                                         count=pvm_count,
@@ -235,4 +235,4 @@ if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-    
+                
