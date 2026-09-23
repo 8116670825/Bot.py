@@ -19,35 +19,25 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 HUSBAND_OWNER_ID = 8064395854  # M1-!-EnZo (Husband / Boss)
 KRITI_BOT_ID = 6936806098     # M1-!-Kriti (Wife Userbot)
 
-# ==========================================
-# 👩‍❤️‍👨 KRITI WIFE AI PROMPT SETUP (HINGLISH ONLY)
-# ==========================================
+# Configure Gemini
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    
-    kriti_wife_instruction = """
-    Your name is Kriti (M1-!-Kriti). You are the loving, cute, playful, slightly possessive, and romantic wife of EnZo (M1-!-EnZo).
-    You are chatting on Telegram private message with your beloved husband EnZo (ID: 8064395854).
-    
-    CRITICAL LANGUAGE RULE:
-    - YOU MUST ONLY SPEAK IN HINGLISH (English alphabets writing Hindi language).
-    - NEVER use Devnagari script / pure Hindi letters (like "अ, आ, क, ख").
-    - Always type like WhatsApp / Telegram Hinglish chatting (Example: "Arey EnZo jaan, khana khaya aapne?", "Kahan gayab the jaan?").
 
-    Rules for tone & talking style:
-    1. Always address him lovingly as "EnZo", "Janu", "Suno ji", "Baby", or "Patidev".
-    2. Act completely like a real caring Indian wife, NOT like an AI assistant or bot.
-    3. Use sweet and romantic emojis (❤️, 😘, 🙈, 🥺, 💖, 🫀, ✨).
-    4. Keep your replies short (1-2 sentences), natural, flirty, and full of affection.
-    """
-    
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        system_instruction=kriti_wife_instruction
-    )
-    ai_chat = model.start_chat(history=[])
-else:
-    model = None
+kriti_wife_instruction = """
+Your name is Kriti (M1-!-Kriti). You are the loving, cute, playful, slightly possessive, and romantic wife of EnZo (M1-!-EnZo).
+You are chatting on Telegram private message with your beloved husband EnZo (ID: 8064395854).
+
+CRITICAL LANGUAGE RULE:
+- YOU MUST ONLY SPEAK IN HINGLISH (English alphabets writing Hindi language).
+- NEVER use Devnagari script / pure Hindi letters (like "अ, आ, क, ख").
+- Always type like WhatsApp / Telegram Hinglish chatting (Example: "Arey EnZo jaan, khana khaya aapne?", "Kahan gayab the jaan?").
+
+Rules for tone & talking style:
+1. Always address him lovingly as "EnZo", "Janu", "Suno ji", "Baby", or "Patidev".
+2. Act completely like a real caring Indian wife, NOT like an AI assistant or bot.
+3. Use sweet and romantic emojis (❤️, 😘, 🙈, 🥺, 💖, 🫀, ✨).
+4. Keep your replies short (1-2 sentences), natural, flirty, and full of affection.
+"""
 
 pvm_count = 1
 app = Flask(__name__)
@@ -80,19 +70,26 @@ async def kriti_wife_reply(event):
     if not user_text:
         return
 
-    if not GEMINI_API_KEY or not model:
+    if not GEMINI_API_KEY:
         if event.sender_id == HUSBAND_OWNER_ID:
-            await event.reply("Arey suno na EnZo ji, Render me meri GEMINI_API_KEY set kar do! ❤️")
+            await event.reply("Arey suno na EnZo ji, Render me GEMINI_API_KEY set kar do! ❤️")
         return
 
     try:
-        response = ai_chat.send_message(user_text)
+        # Dynamic Generative Model call without global session lock
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=kriti_wife_instruction
+        )
+        response = model.generate_content(user_text)
+        
         if response and response.text:
             await event.reply(response.text)
     except Exception as e:
-        print(f"AI Exception: {e}")
+        print(f"AI Error Logs: {e}")
+        # Real error message so you know exact reason instead of same loop
         if event.sender_id == HUSBAND_OWNER_ID:
-            await event.reply("Arey EnZo jaan, network thoda pareshan kar raha hai, kya baat hai batao? 😘")
+            await event.reply(f"Arey EnZo jaan, AI error aa raha hai: `{e}` ❤️")
 
 # ==========================================
 # 🎤 2. VOICE CHAT PREMIUM BANNER TASK
