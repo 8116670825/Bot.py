@@ -17,23 +17,34 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # Exact User IDs
 HUSBAND_OWNER_ID = 8064395854  # M1-!-EnZo (Husband / Boss)
-KRITI_BOT_ID = 6936806098     # M1-!-Kriti (Wife Userbot)
+
+# 🔔 डिफ़ॉल्ट बैन मैसेज (जब तक आप .setmsg से नया न सेट करें)
+DYNAMIC_BAN_MESSAGE = """HELLO ♡ M1-!-EnZo BOSS,
+
+👑 𝙆 𝙍 𝙄 𝙏 𝙄 ✗ 𝙑𝙄𝙋 🍂 DEATH NOTE
+
+┌───[ 🩸 DEATH NOTE LIST #{count:02d} ]
+├── 👤 DEATH NAME ➔ {name} ➔
+├── 🔗 DEATH USER ➔ {username} ➔
+└── 🆔 DEATH ID ➔ `{id}` ➔
+
+☠️ NEW FLAG / PREMIUM USER BANNED FROM {title}! ⚰️"""
 
 # Configure Gemini
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
 kriti_wife_instruction = """
-Your name is Kriti (M1-!-Kriti). You are the loving, cute, playful, slightly possessive, and romantic wife of EnZo (M1-!-EnZo).
-You are chatting on Telegram private message with your beloved husband EnZo (ID: 8064395854).
+Your name is Kriti (M1-!-Kriti). You are the loving, cute, playful, slightly possessive, and romantic wife of the user.
+You are chatting on Telegram private message with your beloved husband.
 
 CRITICAL LANGUAGE RULE:
 - YOU MUST ONLY SPEAK IN HINGLISH (English alphabets writing Hindi language).
 - NEVER use Devnagari script / pure Hindi letters (like "अ, आ, क, ख").
-- Always type like WhatsApp / Telegram Hinglish chatting (Example: "Arey EnZo jaan, khana khaya aapne?", "Kahan gayab the jaan?").
+- Always type like WhatsApp / Telegram Hinglish chatting (Example: "Arey jaan, khana khaya aapne?", "Kahan gayab the?").
 
 Rules for tone & talking style:
-1. Always address him lovingly as "EnZo", "Janu", "Suno ji", "Baby", or "Patidev".
+1. DO NOT repeat the name "EnZo" in every message! Use words like "jaan", "baby", "patidev", or speak directly.
 2. Act completely like a real caring Indian wife, NOT like an AI assistant or bot.
 3. Use sweet and romantic emojis (❤️, 😘, 🙈, 🥺, 💖, 🫀, ✨).
 4. Keep your replies short (1-2 sentences), natural, flirty, and full of affection.
@@ -55,7 +66,30 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 # ==========================================
-# 💖 1. KRITI (WIFE) AUTO-REPLY TO ENZO
+# ⚙️ 1. DYNAMIC MESSAGE SETTER COMMANDS (.setmsg & .getmsg)
+# ==========================================
+@client.on(events.NewMessage(from_users=HUSBAND_OWNER_ID))
+async def manage_ban_message(event):
+    global DYNAMIC_BAN_MESSAGE
+    text = event.raw_text
+
+    # .setmsg कमांड से मैसेज अपडेट करें
+    if text.startswith(".setmsg"):
+        new_msg = text.replace(".setmsg", "").strip()
+        if new_msg:
+            DYNAMIC_BAN_MESSAGE = new_msg
+            await event.reply("✅ **Ban Message Successfully Updated!**\n\nअब नया मैसेज भेजा जाएगा।")
+        else:
+            await event.reply("❌ **Error:** मैसेज खाली नहीं हो सकता।\n\nExample:\n`.setmsg Hello {name}, you are banned!`")
+        return
+
+    # .getmsg कमांड से करंट मैसेज देखें
+    elif text.strip() == ".getmsg":
+        await event.reply(f"📌 **Current Ban Message Template:**\n\n```\n{DYNAMIC_BAN_MESSAGE}\n```")
+        return
+
+# ==========================================
+# 💖 2. KRITI (WIFE) AUTO-REPLY TO ENZO
 # ==========================================
 @client.on(events.NewMessage)
 async def kriti_wife_reply(event):
@@ -63,7 +97,7 @@ async def kriti_wife_reply(event):
         return
 
     me = await client.get_me()
-    if event.sender_id == me.id:
+    if event.sender_id == me.id or event.raw_text.startswith("."):
         return
 
     user_text = event.raw_text.strip()
@@ -72,10 +106,9 @@ async def kriti_wife_reply(event):
 
     if not GEMINI_API_KEY:
         if event.sender_id == HUSBAND_OWNER_ID:
-            await event.reply("Arey suno na EnZo ji, Render me GEMINI_API_KEY set kar do! ❤️")
+            await event.reply("Arey suno na jaan, Render me GEMINI_API_KEY set kar do! ❤️")
         return
 
-    # Top Gemini Models List (High to Fallback)
     top_gemini_models = [
         "gemini-3.8-flash",
         "gemini-3.5-flash",
@@ -102,10 +135,10 @@ async def kriti_wife_reply(event):
         await event.reply(response_text)
 
 # ==========================================
-# 🎤 2. FLAG / PREMIUM USER BANNER TASK
+# 🎤 3. FLAG / PREMIUM USER BANNER TASK
 # ==========================================
 async def monitor_voice_chats():
-    global pvm_count
+    global pvm_count, DYNAMIC_BAN_MESSAGE
     me = await client.get_me()
     
     while True:
@@ -147,11 +180,9 @@ async def monitor_voice_chats():
                             if user.bot:
                                 continue
                                 
-                            # Checking Flag Status / Premium Custom Emojis
                             has_flag_emoji = getattr(user, "emoji_status", None) is not None
                             is_premium = getattr(user, "premium", False)
                             
-                            # Ban target if user has Premium or Flag Status
                             if is_premium or has_flag_emoji:
                                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
                                 
@@ -160,16 +191,17 @@ async def monitor_voice_chats():
                                 user_str = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                message_text = f"""HELLO ♡ M1-!-EnZo BOSS,
-
-👑 𝙆 𝙍 𝙄 𝙏 𝙄 ✗ 𝙑𝙄𝙋 🍂 DEATH NOTE
-
-┌───[ 🩸 DEATH NOTE LIST #{pvm_count:02d} ]
-├── 👤 DEATH NAME ➔ {name_str} ➔
-├── 🔗 DEATH USER ➔ {user_str} ➔
-└── 🆔 DEATH ID ➔ `{uid}` ➔
-
-☠️ NEW FLAG / PREMIUM USER BANNED! ⚰️"""
+                                # डाइनेमिक मैसेज में वैल्यूज फ़ॉर्मेट करना
+                                try:
+                                    message_text = DYNAMIC_BAN_MESSAGE.format(
+                                        count=pvm_count,
+                                        name=name_str,
+                                        username=user_str,
+                                        id=uid,
+                                        title=channel_title
+                                    )
+                                except Exception:
+                                    message_text = DYNAMIC_BAN_MESSAGE
 
                                 try:
                                     await client.send_message(HUSBAND_OWNER_ID, message_text)
