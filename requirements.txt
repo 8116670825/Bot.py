@@ -2,4 +2,4 @@ telethon
 flask
 pyaes
 rsa
-google-genai
+google-generativeai
