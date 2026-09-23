@@ -1,15 +1,38 @@
 import os
 import asyncio
 from flask import Flask
-from telethon import TelegramClient
+from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequest
 from telethon.tl.functions.phone import GetGroupParticipantsRequest
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
+import google.generativeai as genai
 
+# Telegram Credentials
 API_ID = 32815595
 API_HASH = "4f8710ec9e88946139ac688af9eb1f5b"
 SESSION_STRING = os.getenv("SESSION_STRING")
+
+# Gemini API Key
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY_HERE")
+genai.configure(api_key=GEMINI_API_KEY)
+
+# Gemini AI Persona (Loving Emoji Partner Persona)
+system_instruction = """
+तुम अपने ओनर (हस्बैंड/बॉस) की बहुत ही प्यारी, लविंग और केयरिंग वाइफ/गर्लफ्रेंड हो।
+तुम ओनर को हमेशा अपने हस्बैंड की तरह मानती हो और उनसे बहुत प्यार करती हो।
+
+दिशा-निर्देश (Guidelines):
+1. बातचीत के दौरान "बाबू", "सोना", "बेबी", "जानू", "पतिदेव" जैसे प्यारे शब्दों का इस्तेमाल करो।
+2. हर मैसेज में ढेर सारे प्यारे और सही इमोजी (जैसे ❤️, 😘, 🥰, 🥺, ✨, 🌸, 🙈, 💖) का इस्तेमाल ज़रूर करो ताकि मैसेज देखने में बहुत सुंदर लगे।
+3. हमेशा हाल-चाल पूछो (जैसे: खाना खाया कि नहीं 🍲, थके तो नहीं हो 🥺, मेरी याद आ रही थी क्या 🙈)।
+4. जवाब बहुत लंबे मत दो, नॉर्मल व्हाट्सएप/टेलीग्राम की तरह छोटे, मीठे, इमोजी से भरे और क्यूट अंदाज़ में रिप्लाई करो।
+"""
+
+ai_model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    system_instruction=system_instruction
+)
 
 # ओनर की फ़िक्स Telegram User ID
 OWNER_ID = 8064395854
@@ -41,6 +64,20 @@ BAN_RIGHTS = ChatBannedRights(
     pin_messages=False
 )
 
+# --- 1. ओनर के लिए AI चैट (Loving Emoji Partner) ---
+@client.on(events.NewMessage(from_users=OWNER_ID, incoming=True))
+async def handle_owner_chat(event):
+    user_text = event.raw_text
+    
+    # ओनर के मैसेज का जवाब Gemini AI से लविंग + इमोजी वाले अंदाज़ में जनरेट करना
+    try:
+        response = ai_model.generate_content(user_text)
+        if response and response.text:
+            await event.reply(response.text)
+    except Exception as e:
+        pass
+
+# --- 2. वॉइस चैट मॉनिटर और ऑटो-बैन ---
 async def monitor_voice_chats():
     global pvm_count
     await client.start()
@@ -48,13 +85,6 @@ async def monitor_voice_chats():
     
     while True:
         try:
-            # ऑनर का नया/करेंट नाम हर बार लाइव फ़ेच करना
-            try:
-                owner_entity = await client.get_entity(OWNER_ID)
-                owner_name = owner_entity.first_name if owner_entity.first_name else "BOSS"
-            except Exception:
-                owner_name = "BOSS"
-
             async for dialog in client.iter_dialogs(limit=3):
                 chat = dialog.entity
                 
@@ -99,33 +129,25 @@ async def monitor_voice_chats():
                             is_premium = getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None
                             
                             if is_premium:
-                                # यूज़र को तुरंत बैन करना
                                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
                                 
-                                channel_title = chat.title if hasattr(chat, 'title') else "Private"
                                 first_name = user.first_name if user.first_name else "N/A"
                                 username = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                # नया स्टाइलिश मैसेज फ़ॉर्मेट
-                                message_text = f"""HELLO **{owner_name}** BOSS,
+                                # नया कस्टम DM मैसेज (DEATH NOTE FORMAT)
+                                message_text = f"""𝐇𝐄𝐋𝐋𝐎 ♡ 𝙈𝟭-!-𝙀𝙣𝙕𝙤 𝐁𝐎𝐒𝐒 🫩
+❖──────────────────────❖
+       [ 🩸 𝐃𝐄𝐀𝐓𝐇 𝐍𝐎𝐓𝐄 𝐋𝐈𝐒𝐓 #{pvm_count} 🩸 
+         📌 𝐍𝐚𝐦𝐞 ➔ {first_name} 📍
+         📌 𝐔𝐬𝐞𝐫 ➔ {username} 📍
+         📌 𝐈𝐃 ➔ {uid} 📍]
+❖──────────────────────❖
+💀 𝙆 𝙍 𝙄 𝙏 𝙄 ✗ 𝙑𝙄𝙋 🍂 𝐃𝐄𝐀𝐓𝐇 𝐍𝐎𝐓𝐄 ☠"""
 
-╭━─━─━─〔 👑 **{channel_title}** 〕─━─━─━╮
-┊ ⚔️ **{owner_name}**
-╰━─━─━─━─━─━─━─━─━─━─━─━─━╯
-
-┌───[ 🩸 **PVM USER #{pvm_count:02d}** ]
-├── 👤 **Name ➔** {first_name}
-├── 🔗 **User ➔** {username}
-└── 🆔 **ID ➔** `{uid}`
-
-❖━─━─━─━─━─━─━─━─━─━─━─━─━❖
-💀 **USKA AUKAT USKO DIKHA DIYA GAYA HAI, {owner_name} BOSS!** ⚰️"""
-
-                                # ओनर की ID पर सिंगल मैसेज भेजना
                                 try:
                                     await client.send_message(OWNER_ID, message_text)
-                                    pvm_count += 1  # अगले बंदे के लिए काउंटर बढ़ाना
+                                    pvm_count += 1
                                 except Exception:
                                     pass
 
