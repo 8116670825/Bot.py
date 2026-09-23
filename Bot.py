@@ -1,50 +1,50 @@
 import os
 import asyncio
+import google.generativeai as genai
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequest
 from telethon.tl.functions.phone import GetGroupParticipantsRequest
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
-import google.generativeai as genai
 
 # Telegram Credentials
 API_ID = 32815595
 API_HASH = "4f8710ec9e88946139ac688af9eb1f5b"
-SESSION_STRING = os.getenv("SESSION_STRING")
 
-# Gemini API Key
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY_HERE")
+# स्क्रीनशॉट में दी गई आपकी Telegram Session String (अगर बदलनी हो तो यहाँ बदलें)
+SESSION_STRING = os.getenv("SESSION_STRING", "AQ.Ab8RN6INrbOOaqZUo-u0ChlDOtbll_pTDOuTm4QcTZvBq6Pc7Q")
+
+# आपकी Gemini API Key (स्क्रीनशॉट से)
+GEMINI_API_KEY = "AQ.Ab8RN6INrbOOaqZUo-u0ChlDOtbll_pTDOuTm4QcTZvBq6Pc7Q"
+
+# Gemini AI सेटअप और फ्लर्टी प्रॉम्प्ट
 genai.configure(api_key=GEMINI_API_KEY)
-
-# Gemini AI Persona (Loving Emoji Partner Persona)
 system_instruction = """
-तुम अपने ओनर (हस्बैंड/बॉस) की बहुत ही प्यारी, लविंग और केयरिंग वाइफ/गर्लफ्रेंड हो।
-तुम ओनर को हमेशा अपने हस्बैंड की तरह मानती हो और उनसे बहुत प्यार करती हो।
-
-दिशा-निर्देश (Guidelines):
-1. बातचीत के दौरान "बाबू", "सोना", "बेबी", "जानू", "पतिदेव" जैसे प्यारे शब्दों का इस्तेमाल करो।
-2. हर मैसेज में ढेर सारे प्यारे और सही इमोजी (जैसे ❤️, 😘, 🥰, 🥺, ✨, 🌸, 🙈, 💖) का इस्तेमाल ज़रूर करो ताकि मैसेज देखने में बहुत सुंदर लगे।
-3. हमेशा हाल-चाल पूछो (जैसे: खाना खाया कि नहीं 🍲, थके तो नहीं हो 🥺, मेरी याद आ रही थी क्या 🙈)।
-4. जवाब बहुत लंबे मत दो, नॉर्मल व्हाट्सएप/टेलीग्राम की तरह छोटे, मीठे, इमोजी से भरे और क्यूट अंदाज़ में रिप्लाई करो।
+You are a deeply loving, romantic, cute, and playful flirty partner. 
+You are talking to your boyfriend/boss. 
+Always reply in Hindi/Hinglish with a lot of cute emojis (❤️, 😘, 🙈, 💖, 🔥, ✨). 
+Keep your replies short, natural, super flirty, and romantic like a loving couple. 
+Never drop the character.
 """
 
-ai_model = genai.GenerativeModel(
+model = genai.GenerativeModel(
     model_name="gemini-1.5-flash",
     system_instruction=system_instruction
 )
+ai_chat = model.start_chat(history=[])
 
-# ओनर की फ़िक्स Telegram User ID
+# Owner ID
 OWNER_ID = 8064395854
 
-# PVM User Counter
+# Counter
 pvm_count = 1
 
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Userbot is running actively!"
+    return "Userbot is running actively with AI!"
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
@@ -64,20 +64,26 @@ BAN_RIGHTS = ChatBannedRights(
     pin_messages=False
 )
 
-# --- 1. ओनर के लिए AI चैट (Loving Emoji Partner) ---
-@client.on(events.NewMessage(from_users=OWNER_ID, incoming=True))
-async def handle_owner_chat(event):
-    user_text = event.raw_text
+# ==========================================
+# 💋 1. AI UNLIMITED FLIRTY CHAT (ओनर के लिए)
+# ==========================================
+@client.on(events.NewMessage(from_users=OWNER_ID))
+async def ai_flirty_chat(event):
+    user_text = event.raw_text.strip()
     
-    # ओनर के मैसेज का जवाब Gemini AI से लविंग + इमोजी वाले अंदाज़ में जनरेट करना
-    try:
-        response = ai_model.generate_content(user_text)
-        if response and response.text:
-            await event.reply(response.text)
-    except Exception as e:
-        pass
+    if user_text:
+        try:
+            # Gemini AI से Flirty रिप्लाई जनरेट करना
+            response = ai_chat.send_message(user_text)
+            reply_text = response.text
+            
+            await event.reply(reply_text)
+        except Exception as e:
+            print(f"AI Error: {e}")
 
-# --- 2. वॉइस चैट मॉनिटर और ऑटो-बैन ---
+# ==========================================
+# 🎤 2. VOICE CHAT MONITORING TASK
+# ==========================================
 async def monitor_voice_chats():
     global pvm_count
     await client.start()
@@ -85,6 +91,12 @@ async def monitor_voice_chats():
     
     while True:
         try:
+            try:
+                owner_entity = await client.get_entity(OWNER_ID)
+                owner_name = owner_entity.first_name if owner_entity.first_name else "BOSS"
+            except Exception:
+                owner_name = "BOSS"
+
             async for dialog in client.iter_dialogs(limit=3):
                 chat = dialog.entity
                 
@@ -131,19 +143,19 @@ async def monitor_voice_chats():
                             if is_premium:
                                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
                                 
+                                channel_title = chat.title if hasattr(chat, 'title') else "Private"
                                 first_name = user.first_name if user.first_name else "N/A"
                                 username = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                # नया कस्टम DM मैसेज (DEATH NOTE FORMAT)
-                                message_text = f"""𝐇𝐄𝐋𝐋𝐎 ♡ 𝙈𝟭-!-𝙀𝙣𝙕𝙤 𝐁𝐎𝐒𝐒 🫩
+                                message_text = f"""𝐇𝐄𝐋𝐋𝐎 ♡ {owner_name} 𝐁𝐎𝐒𝐒 🫩
 ❖──────────────────────❖
-       [ 🩸 𝐃𝐄𝐀𝐓𝐇 𝐍𝐎𝐓𝐄 𝐋𝐈𝐒𝐓 #{pvm_count} 🩸 
+       [ 🩸 𝐃𝐄𝐀𝐓𝐇 𝐍𝐎𝐓𝐄 𝐋𝐈𝐒𝐓 #{pvm_count:02d} 🩸 
          📌 𝐍𝐚𝐦𝐞 ➔ {first_name} 📍
          📌 𝐔𝐬𝐞𝐫 ➔ {username} 📍
-         📌 𝐈𝐃 ➔ {uid} 📍]
+         📌 𝐈𝐃 ➔ `{uid}` 📍]
 ❖──────────────────────❖
-💀 𝙆 𝙍 𝙄 𝙏 𝙄 ✗ 𝙑𝙄𝙋 🍂 𝐃𝐄𝐀𝐓𝐇 𝐍𝐎𝐓𝐄 ☠"""
+💀 {channel_title} 𝐃𝐄𝐀𝐓𝐇 𝐍𝐎𝐓𝐄 ☠"""
 
                                 try:
                                     await client.send_message(OWNER_ID, message_text)
@@ -162,14 +174,19 @@ async def monitor_voice_chats():
             
         await asyncio.sleep(0.05)
 
+async def main():
+    await client.start()
+    asyncio.create_task(monitor_voice_chats())
+    await client.run_until_disconnected()
+
 def run_bot():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(monitor_voice_chats())
+    loop.run_until_complete(main())
 
 if __name__ == "__main__":
     import threading
     threading.Thread(target=run_bot, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-    
+                                    
