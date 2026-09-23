@@ -1,25 +1,26 @@
 import os
 import asyncio
-import google.generativeai as genai
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequest
 from telethon.tl.functions.phone import GetGroupParticipantsRequest
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
+from google import genai
+from google.genai import types
 
 # Telegram Credentials
 API_ID = 32815595
 API_HASH = "4f8710ec9e88946139ac688af9eb1f5b"
 
-# स्क्रीनशॉट में दी गई आपकी Telegram Session String (अगर बदलनी हो तो यहाँ बदलें)
-SESSION_STRING = os.getenv("SESSION_STRING", "AQ.Ab8RN6INrbOOaqZUo-u0ChlDOtbll_pTDOuTm4QcTZvBq6Pc7Q")
+# Render Environment Variables से ऑटोमैटिक values उठाएगा
+SESSION_STRING = os.getenv("SESSION_STRING")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# आपकी Gemini API Key (स्क्रीनशॉट से)
-GEMINI_API_KEY = "AQ.Ab8RN6INrbOOaqZUo-u0ChlDOtbll_pTDOuTm4QcTZvBq6Pc7Q"
+# New Gemini SDK Client Initialize
+ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
-# Gemini AI सेटअप और फ्लर्टी प्रॉम्प्ट
-genai.configure(api_key=GEMINI_API_KEY)
+# Gemini AI Persona (Romantic & Flirty Partner)
 system_instruction = """
 You are a deeply loving, romantic, cute, and playful flirty partner. 
 You are talking to your boyfriend/boss. 
@@ -28,16 +29,10 @@ Keep your replies short, natural, super flirty, and romantic like a loving coupl
 Never drop the character.
 """
 
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    system_instruction=system_instruction
-)
-ai_chat = model.start_chat(history=[])
-
-# Owner ID
+# Owner Telegram ID
 OWNER_ID = 8064395854
 
-# Counter
+# PVM Counter
 pvm_count = 1
 
 app = Flask(__name__)
@@ -67,17 +62,22 @@ BAN_RIGHTS = ChatBannedRights(
 # ==========================================
 # 💋 1. AI UNLIMITED FLIRTY CHAT (ओनर के लिए)
 # ==========================================
-@client.on(events.NewMessage(from_users=OWNER_ID))
+@client.on(events.NewMessage(from_users=OWNER_ID, incoming=True))
 async def ai_flirty_chat(event):
     user_text = event.raw_text.strip()
     
     if user_text:
         try:
-            # Gemini AI से Flirty रिप्लाई जनरेट करना
-            response = ai_chat.send_message(user_text)
-            reply_text = response.text
-            
-            await event.reply(reply_text)
+            # New Gemini SDK Content Generation
+            response = ai_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=user_text,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction
+                )
+            )
+            if response and response.text:
+                await event.reply(response.text)
         except Exception as e:
             print(f"AI Error: {e}")
 
@@ -86,7 +86,6 @@ async def ai_flirty_chat(event):
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count
-    await client.start()
     me = await client.get_me()
     
     while True:
@@ -189,4 +188,4 @@ if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-                                    
+    
