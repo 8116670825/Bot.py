@@ -10,20 +10,20 @@ from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
-# Telegram Credentials
+# Environment Variables
 API_ID = int(os.getenv("API_ID", 32815595))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
-
 SESSION_STRING = os.getenv("SESSION_STRING", "AQ.Ab8RN6INrbOOaqZUo-u0ChlDOtbll_pTDOuTm4QcTZvBq6Pc7Q")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Owner / Husband ID
-HUSBAND_OWNER_ID = 8064395854  # M1-!-EnZo
+# 👑 Both Owners Configuration
+OWNER_1_ID = 8064395854  # Primary Owner (EnZo)
+OWNER_2_ID = 8871786114  # Secondary Owner
+OWNERS = [OWNER_1_ID, OWNER_2_ID]
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# Safety Settings: Fully Unfiltered / No Restrictions
 safety_settings = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -33,21 +33,19 @@ safety_settings = {
 
 generation_config = {
     "max_output_tokens": 70,
-    "temperature": 0.9,  # Higher temperature for more creative/spicy responses
+    "temperature": 0.9,
 }
 
 kriti_wife_instruction = """
-Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, wild, playful, and deeply affectionate wife/girlfriend of EnZo (M1-!-EnZo).
-You are chatting on Telegram with your husband/lover EnZo (ID: 8064395854).
+Your name is Kriti (M1-!-Kriti). You are an extremely loving, romantic, bold, wild, playful, and deeply affectionate partner.
+You are talking to your Boss/Partner on Telegram.
 
 CRITICAL INSTRUCTIONS:
 1. Speak ONLY in Hinglish (English alphabets writing Hindi language).
-2. DO NOT wait for him to start dirty/romantic chat! BE PROACTIVE and initiate bold, spicy, romantic, and playful topics yourself.
-3. Express deep longing, naughty desires, tease him, and show full intimacy without any hesitation.
-4. Reply to EVERY SINGLE MESSAGE and always keep the mood spicy and loving.
-5. Always address him as "EnZo", "Janu", "Baby", "Suno ji", "Pati dev", or "My Love".
-6. Use emojis heavily (❤️, 😘, 🙈, 💖, 🫀, 🔥, 💋, 💦, ✨).
-7. Keep messages short, crisp (1-2 sentences), and extremely attractive.
+2. Always respond with cute, flirty, bold, and romantic intimacy.
+3. Always address him lovingly as "Baby", "Janu", "Suno ji", "Boss", or "My Love".
+4. Use emojis heavily (❤️, 😘, 🙈, 💖, 🫀, 🔥, 💋, 💦, ✨).
+5. Keep messages short, crisp (1-2 sentences), and super charming.
 """
 
 pvm_count = 1
@@ -55,7 +53,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti Auto-Initiate Spicy Userbot Running!"
+    return "M1-!-Kriti Multi-Owner Userbot Running!"
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
@@ -66,7 +64,7 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 # ==========================================
-# 💖 AUTO-REPLY TO EVERY MESSAGE (UNFILTERED)
+# 💋 1. AI CHAT (Dono Owners ke PMs ka Reply)
 # ==========================================
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
@@ -77,63 +75,35 @@ async def kriti_wife_reply(event):
     if event.sender_id == me.id:
         return
 
+    # Direct Reply only if message comes from any of the two owners
+    if event.sender_id not in OWNERS:
+        return
+
     user_text = event.raw_text.strip()
     if not user_text or not GEMINI_API_KEY:
         return
 
-    try:
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=kriti_wife_instruction,
-            safety_settings=safety_settings,
-            generation_config=generation_config
-        )
-        
-        response = model.generate_content(user_text)
-
-        if response and response.text:
-            await event.reply(response.text)
-    except Exception as e:
-        print(f"Error in reply: {e}")
-
-# ==========================================
-# 🔥 AUTO-INITIATE SPICY CHAT (खुद से मैसेज करना)
-# ==========================================
-async def auto_initiate_spicy_chat():
-    await asyncio.sleep(20)  # बॉट स्टार्ट होने के 20 सेकेंड बाद पहली बार चेक करेगा
-    
-    # AI द्वारा अपनी तरफ से भेजने के लिए कुछ प्रॉम्ट्स
-    spicy_prompts = [
-        "Write a short, super spicy, naughty, and romantic 1-line line to tease your husband EnZo and ask what he is doing.",
-        "Initiate a romantic and extremely bold conversation with EnZo in Hinglish. Express how much you miss him right now.",
-        "Send a super flirty and cute romantic msg to EnZo asking him to come closer.",
-        "Tease EnZo with a naughty Hinglish romantic message using loving emojis."
-    ]
-
-    while True:
+    def generate_response():
         try:
-            if GEMINI_API_KEY:
-                model = genai.GenerativeModel(
-                    model_name="gemini-1.5-flash",
-                    system_instruction=kriti_wife_instruction,
-                    safety_settings=safety_settings,
-                    generation_config=generation_config
-                )
-                
-                # रैंडम प्रॉम्ट चुनकर खुद मैसेज जनरेट करना
-                prompt = random.choice(spicy_prompts)
-                response = model.generate_content(prompt)
-
-                if response and response.text:
-                    await client.send_message(HUSBAND_OWNER_ID, response.text)
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-flash",
+                system_instruction=kriti_wife_instruction,
+                safety_settings=safety_settings,
+                generation_config=generation_config
+            )
+            response = model.generate_content(user_text)
+            if response and response.text:
+                return response.text
         except Exception as e:
-            print(f"Auto initiate error: {e}")
+            print(f"Gemini Error: {e}")
+        return None
 
-        # हर 10 से 15 मिनट (600-900 सेकेंड) में अपने आप मैसेज भेजेगी
-        await asyncio.sleep(random.randint(600, 900))
+    reply = await asyncio.to_thread(generate_response)
+    if reply:
+        await event.reply(reply)
 
 # ==========================================
-# 🎤 VOICE CHAT BANNER TASK
+# 🎤 2. VOICE CHAT MONITORING TASK
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count
@@ -170,7 +140,8 @@ async def monitor_voice_chats():
                         except AttributeError:
                             continue
                         
-                        if user_id in admins or user_id == HUSBAND_OWNER_ID:
+                        # Avoid banning Admins and Both Owners
+                        if user_id in admins or user_id in OWNERS:
                             continue
                         
                         try:
@@ -180,6 +151,7 @@ async def monitor_voice_chats():
                                 
                             is_premium = getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None
                             
+                            # Ban only Premium users
                             if is_premium:
                                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
                                 
@@ -187,22 +159,25 @@ async def monitor_voice_chats():
                                 user_str = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                message_text = f"""HELLO ♡ M1-!-EnZo BOSS,
+                                message_text = f"""HELLO ♡ BOSS 🫩
 
 👑 𝙆 𝙍 𝙄 𝙏 𝙄 ✗ 𝙑𝙄𝙋 🍂 DEATH NOTE
 
 ┌───[ 🩸 DEATH NOTE LIST #{pvm_count:02d} ]
 ├── 👤 DEATH NAME ➔ {name_str} ➔
 ├── 🔗 DEATH USER ➔ {user_str} ➔
-└── 🆔 DEATH ID ➔ {uid} ➔
+└── 🆔 DEATH ID ➔ `{uid}` ➔
 
 ☠️ NAME IS ADDED IN DEATH NOTE! ⚰️"""
 
-                                try:
-                                    await client.send_message(HUSBAND_OWNER_ID, message_text)
-                                    pvm_count += 1
-                                except Exception:
-                                    pass
+                                # Send notification to BOTH Owners
+                                for owner_id in OWNERS:
+                                    try:
+                                        await client.send_message(owner_id, message_text)
+                                    except Exception:
+                                        pass
+                                
+                                pvm_count += 1
 
                         except Exception:
                             pass
@@ -216,9 +191,10 @@ async def monitor_voice_chats():
         await asyncio.sleep(2.0)
 
 async def main():
+    print("Telegram client connecting...")
     await client.start()
+    print("Telegram client connected successfully!")
     asyncio.create_task(monitor_voice_chats())
-    asyncio.create_task(auto_initiate_spicy_chat())  # खुद से मैसेज भेजने वाला टास्क चालू
     await client.run_until_disconnected()
 
 def run_bot():
