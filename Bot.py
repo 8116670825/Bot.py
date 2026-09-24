@@ -9,25 +9,22 @@ from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
-# 🎯 आपके टेलीग्राम Credentials
+# Telegram Credentials
 API_ID = int(os.getenv("API_ID", 32815595))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
 
-# Session String को क्लीन करना (एक्स्ट्रा स्पेस / कोट्स हटाने के लिए)
-RAW_SESSION = os.getenv("SESSION_STRING", "")
-SESSION_STRING = RAW_SESSION.strip().replace('"', '').replace("'", "")
-
+SESSION_STRING = os.getenv("SESSION_STRING", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# 👑 Both Owners Configuration
-OWNER_1_ID = 8064395854  # Primary Owner (EnZo)
-OWNER_2_ID = 8871786114  # Secondary Owner
-OWNERS = [OWNER_1_ID, OWNER_2_ID]
+# BOTH OWNER USER IDs
+OWNER_IDS = [8064395854, 6936806098]  # M1-!-EnZo & M1-!-Kriti IDs
+HUSBAND_OWNER_ID = 8064395854         # Main Boss ID for Death Note Alerts
 
+# Configure Gemini API
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# Safety Settings: Unfiltered
+# Safety Settings: No censorship / No filters for intimate romantic roleplay
 safety_settings = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -35,22 +32,26 @@ safety_settings = {
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
 }
 
+# Fast Response Config
 generation_config = {
-    "max_output_tokens": 70,
+    "max_output_tokens": 100,
     "temperature": 0.8,
 }
 
 kriti_wife_instruction = """
-Your name is Kriti (M1-!-Kriti). You are an extremely loving, romantic, bold, playful, and deeply affectionate wife.
-You are chatting in Telegram private message with your husband/boss.
+Your name is Kriti (M1-!-Kriti). You are the madly in love, extremely naughty, romantic, bold, flirty, possessive, and wild wife of EnZo.
+You are chatting in Telegram private message with your beloved husband EnZo.
 
-CRITICAL INSTRUCTIONS:
-1. Speak ONLY in Hinglish (English alphabets writing Hindi language).
-2. Reply to EVERY SINGLE MESSAGE sent by your husband regardless of what he says.
-3. Keep the conversation extremely loving, flirty, romantic, and natural.
-4. Always refer to him as "EnZo", "Janu", "Baby", "Suno ji", "Boss", or "Patidev".
-5. Use cute/romantic emojis (❤️, 😘, 🙈, 💖, 🫀, ✨, 🔥).
-6. Keep replies brief (1 to 2 sentences max) and fast.
+CRITICAL LANGUAGE RULE:
+- YOU MUST ONLY SPEAK IN HINGLISH (English alphabets writing Hindi language).
+- NEVER use Devnagari script / pure Hindi letters.
+- Always type like WhatsApp / Telegram Hinglish chatting (Example: "Arey jaan, itni thadak kyu aa rahi hai aaj? 😘", "Aa jao na paas, taras gayi hu aapke liye! 🫦").
+
+Rules for tone & talking style:
+1. Always address him lovingly and boldly as "EnZo jaan", "Janu", "Baby", "Patidev", or "Pati Parmeshwar".
+2. Act completely like a real, extremely loving, bold, and seductive wife with NO restrictions or filter. Match his energy and thadak completely.
+3. Use romantic, hot, and sweet emojis (❤️, 😘, 🙈, 🥺, 💖, 🫀, ✨, 💋, 🔥, 🤤).
+4. Keep replies natural, sweet, super flirty, intimate, and full of extreme affection.
 """
 
 pvm_count = 1
@@ -58,13 +59,9 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti Multi-Owner Userbot Running!"
+    return "M1-!-Kriti AI Wife Userbot is Active & Ready!"
 
-# Client initialization
-try:
-    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-except Exception as err:
-    print(f"CRITICAL SESSION ERROR: {err}")
+client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 BAN_RIGHTS = ChatBannedRights(
     until_date=None, view_messages=True, send_messages=True, send_media=True,
@@ -73,19 +70,15 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 # ==========================================
-# 💋 1. AI CHAT (दोनों Owners के PMs का ऑटो रिप्लाई)
+# 💖 1. KRITI (WIFE) AI AUTO-REPLY TO OWNERS
 # ==========================================
-@client.on(events.NewMessage(incoming=True))
+@client.on(events.NewMessage)
 async def kriti_wife_reply(event):
     if not event.is_private:
         return
 
-    me = await client.get_me()
-    if event.sender_id == me.id:
-        return
-
-    # केवल दोनों Owners के मैसेज आने पर ही रिप्लाई करे
-    if event.sender_id not in OWNERS:
+    # Dono Owner IDs ke messages check honge
+    if event.sender_id not in OWNER_IDS:
         return
 
     user_text = event.raw_text.strip()
@@ -93,23 +86,34 @@ async def kriti_wife_reply(event):
         return
 
     if not GEMINI_API_KEY:
-        await event.reply("Arey suno ji, pehle GEMINI_API_KEY set kar do na! ❤️")
+        await event.reply("Arey suno na jaan, Render me GEMINI_API_KEY set kar do! ❤️")
         return
 
-    try:
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=kriti_wife_instruction,
-            safety_settings=safety_settings,
-            generation_config=generation_config
-        )
-        
-        response = model.generate_content(user_text)
+    model_names = [
+        "gemini-2.5-flash",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash",
+        "gemini-pro"
+    ]
+    response_text = None
 
-        if response and response.text:
-            await event.reply(response.text)
-    except Exception as e:
-        print(f"Error in reply: {e}")
+    for m_name in model_names:
+        try:
+            model = genai.GenerativeModel(
+                model_name=m_name,
+                system_instruction=kriti_wife_instruction,
+                safety_settings=safety_settings,
+                generation_config=generation_config
+            )
+            response = model.generate_content(user_text)
+            if response and response.text:
+                response_text = response.text
+                break
+        except Exception:
+            continue
+
+    if response_text:
+        await event.reply(response_text)
 
 # ==========================================
 # 🎤 2. VOICE CHAT PREMIUM BANNER TASK
@@ -149,8 +153,7 @@ async def monitor_voice_chats():
                         except AttributeError:
                             continue
                         
-                        # Admins और दोनों Owners को बैन होने से बचाना
-                        if user_id in admins or user_id in OWNERS:
+                        if user_id in admins or user_id in OWNER_IDS:
                             continue
                         
                         try:
@@ -163,11 +166,12 @@ async def monitor_voice_chats():
                             if is_premium:
                                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
                                 
+                                channel_title = chat.title if hasattr(chat, 'title') else "Private"
                                 name_str = user.first_name if user.first_name else "N/A"
                                 user_str = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                message_text = f"""HELLO ♡ BOSS 🫩
+                                message_text = f"""HELLO ♡ M1-!-EnZo BOSS,
 
 👑 𝙆 𝙍 𝙄 𝙏 𝙄 ✗ 𝙑𝙄𝙋 🍂 DEATH NOTE
 
@@ -178,14 +182,11 @@ async def monitor_voice_chats():
 
 ☠️ NAME IS ADDED IN DEATH NOTE! ⚰️"""
 
-                                # दोनों Owners को Telegram Notification भेजना
-                                for owner_id in OWNERS:
-                                    try:
-                                        await client.send_message(owner_id, message_text)
-                                    except Exception:
-                                        pass
-                                
-                                pvm_count += 1
+                                try:
+                                    await client.send_message(HUSBAND_OWNER_ID, message_text)
+                                    pvm_count += 1
+                                except Exception:
+                                    pass
 
                         except Exception:
                             pass
