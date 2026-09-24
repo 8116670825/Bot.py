@@ -1,5 +1,4 @@
 telethon
-flask
-pyaes
-rsa
+Flask
 google-generativeai
+Pillow
