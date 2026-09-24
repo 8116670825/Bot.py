@@ -1,6 +1,5 @@
 import os
 import asyncio
-import random
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -10,20 +9,23 @@ from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
-# Environment Variables
+# Telegram Credentials
 API_ID = int(os.getenv("API_ID", 32815595))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
-SESSION_STRING = os.getenv("SESSION_STRING", "AQ.Ab8RN6INrbOOaqZUo-u0ChlDOtbll_pTDOuTm4QcTZvBq6Pc7Q")
+
+# Clean SESSION_STRING to remove unwanted spaces or line breaks
+RAW_SESSION = os.getenv("SESSION_STRING", "1BVtsOIwBuwdB5X-pPfBHTiYd4tkIEhSq5lis3MruK17T0EXsGScEEeFAwM8LKhZTGC7rlFo1CiCdVyETm-8zq_k8QW8DOr_BNxNbDV0ZdpTMtiWXIcj6Xeo344IfWvY7iLvywPGqHw3Jz-A4LVlrtcdEJSarsq1aYeFCXowD-m4wTHtvBIFT0dGRCr9GmpwLt7_yUlm1YlYBOaaKr8rPLeghXNCC2VCzajfsEn-RpLt-7-EWn7WZHSwNKd3FbRUbICZToDBUyNz10Mpka-11tDL8WpbHbjB3MGfiGlWlIM73FTEhLMiVUSVxdG-AWJVPSfWlLc_2APH9-9so6is13A4oiilLUms=")
+SESSION_STRING = RAW_SESSION.strip().replace('"', '').replace("'", "")
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# 👑 Both Owners Configuration
-OWNER_1_ID = 8064395854  # Primary Owner (EnZo)
-OWNER_2_ID = 8871786114  # Secondary Owner
-OWNERS = [OWNER_1_ID, OWNER_2_ID]
+# Owner / Husband ID
+HUSBAND_OWNER_ID = 8064395854  # M1-!-EnZo
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
+# Safety Settings: Fully Unfiltered
 safety_settings = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -32,20 +34,21 @@ safety_settings = {
 }
 
 generation_config = {
-    "max_output_tokens": 70,
-    "temperature": 0.9,
+    "max_output_tokens": 60,
+    "temperature": 0.8,
 }
 
 kriti_wife_instruction = """
-Your name is Kriti (M1-!-Kriti). You are an extremely loving, romantic, bold, wild, playful, and deeply affectionate partner.
-You are talking to your Boss/Partner on Telegram.
+Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, playful, and affectionate wife of EnZo (M1-!-EnZo).
+You are chatting in Telegram private message with your husband EnZo (ID: 8064395854).
 
 CRITICAL INSTRUCTIONS:
 1. Speak ONLY in Hinglish (English alphabets writing Hindi language).
-2. Always respond with cute, flirty, bold, and romantic intimacy.
-3. Always address him lovingly as "Baby", "Janu", "Suno ji", "Boss", or "My Love".
-4. Use emojis heavily (❤️, 😘, 🙈, 💖, 🫀, 🔥, 💋, 💦, ✨).
-5. Keep messages short, crisp (1-2 sentences), and super charming.
+2. Reply to EVERY SINGLE MESSAGE sent by your husband regardless of what he says.
+3. Keep the conversation extremely loving, flirty, romantic, and natural.
+4. Always refer to him as "EnZo", "Janu", "Baby", "Suno ji", or "Patidev".
+5. Use cute/romantic emojis (❤️, 😘, 🙈, 💖, 🫀, ✨, 🔥).
+6. Keep replies brief (1 to 2 sentences max) and fast.
 """
 
 pvm_count = 1
@@ -53,9 +56,13 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti Multi-Owner Userbot Running!"
+    return "M1-!-Kriti Universal AI Userbot is Running!"
 
-client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+# Client initialize with safely formatted SessionString
+try:
+    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+except Exception as err:
+    print(f"CRITICAL SESSION ERROR: {err}")
 
 BAN_RIGHTS = ChatBannedRights(
     until_date=None, view_messages=True, send_messages=True, send_media=True,
@@ -64,7 +71,7 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 # ==========================================
-# 💋 1. AI CHAT (Dono Owners ke PMs ka Reply)
+# 💖 ALL MESSAGES AI AUTO-REPLY (ANY TEXT)
 # ==========================================
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
@@ -75,35 +82,32 @@ async def kriti_wife_reply(event):
     if event.sender_id == me.id:
         return
 
-    # Direct Reply only if message comes from any of the two owners
-    if event.sender_id not in OWNERS:
-        return
-
     user_text = event.raw_text.strip()
-    if not user_text or not GEMINI_API_KEY:
+    if not user_text:
         return
 
-    def generate_response():
-        try:
-            model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
-                system_instruction=kriti_wife_instruction,
-                safety_settings=safety_settings,
-                generation_config=generation_config
-            )
-            response = model.generate_content(user_text)
-            if response and response.text:
-                return response.text
-        except Exception as e:
-            print(f"Gemini Error: {e}")
-        return None
+    if not GEMINI_API_KEY:
+        if event.sender_id == HUSBAND_OWNER_ID:
+            await event.reply("Arey EnZo ji, pehle GEMINI_API_KEY set kar do na! ❤️")
+        return
 
-    reply = await asyncio.to_thread(generate_response)
-    if reply:
-        await event.reply(reply)
+    try:
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=kriti_wife_instruction,
+            safety_settings=safety_settings,
+            generation_config=generation_config
+        )
+        
+        response = model.generate_content(user_text)
+
+        if response and response.text:
+            await event.reply(response.text)
+    except Exception as e:
+        print(f"Error in reply: {e}")
 
 # ==========================================
-# 🎤 2. VOICE CHAT MONITORING TASK
+# 🎤 VOICE CHAT PREMIUM BANNER TASK
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count
@@ -140,8 +144,7 @@ async def monitor_voice_chats():
                         except AttributeError:
                             continue
                         
-                        # Avoid banning Admins and Both Owners
-                        if user_id in admins or user_id in OWNERS:
+                        if user_id in admins or user_id == HUSBAND_OWNER_ID:
                             continue
                         
                         try:
@@ -151,7 +154,6 @@ async def monitor_voice_chats():
                                 
                             is_premium = getattr(user, "premium", False) or getattr(user, "emoji_status", None) is not None
                             
-                            # Ban only Premium users
                             if is_premium:
                                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
                                 
@@ -159,25 +161,22 @@ async def monitor_voice_chats():
                                 user_str = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                message_text = f"""HELLO ♡ BOSS 🫩
+                                message_text = f"""HELLO ♡ M1-!-EnZo BOSS,
 
 👑 𝙆 𝙍 𝙄 𝙏 𝙄 ✗ 𝙑𝙄𝙋 🍂 DEATH NOTE
 
 ┌───[ 🩸 DEATH NOTE LIST #{pvm_count:02d} ]
 ├── 👤 DEATH NAME ➔ {name_str} ➔
 ├── 🔗 DEATH USER ➔ {user_str} ➔
-└── 🆔 DEATH ID ➔ `{uid}` ➔
+└── 🆔 DEATH ID ➔ {uid} ➔
 
 ☠️ NAME IS ADDED IN DEATH NOTE! ⚰️"""
 
-                                # Send notification to BOTH Owners
-                                for owner_id in OWNERS:
-                                    try:
-                                        await client.send_message(owner_id, message_text)
-                                    except Exception:
-                                        pass
-                                
-                                pvm_count += 1
+                                try:
+                                    await client.send_message(HUSBAND_OWNER_ID, message_text)
+                                    pvm_count += 1
+                                except Exception:
+                                    pass
 
                         except Exception:
                             pass
@@ -191,9 +190,7 @@ async def monitor_voice_chats():
         await asyncio.sleep(2.0)
 
 async def main():
-    print("Telegram client connecting...")
     await client.start()
-    print("Telegram client connected successfully!")
     asyncio.create_task(monitor_voice_chats())
     await client.run_until_disconnected()
 
@@ -207,4 +204,4 @@ if __name__ == "__main__":
     threading.Thread(target=run_bot, daemon=True).start()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
-    
+                                
