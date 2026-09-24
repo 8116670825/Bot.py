@@ -2,3 +2,4 @@ telethon
 Flask
 google-generativeai
 Pillow
+gunicorn
