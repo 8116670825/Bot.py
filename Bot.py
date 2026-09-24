@@ -1,5 +1,6 @@
 import os
 import asyncio
+import random
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -13,19 +14,16 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 API_ID = int(os.getenv("API_ID", 32815595))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
 
-SESSION_STRING = os.getenv("SESSION_STRING", "")
+SESSION_STRING = os.getenv("SESSION_STRING", "AQ.Ab8RN6INrbOOaqZUo-u0ChlDOtbll_pTDOuTm4QcTZvBq6Pc7Q")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # Owner / Husband ID
 HUSBAND_OWNER_ID = 8064395854  # M1-!-EnZo
 
-# Configure Gemini API
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# ==========================================
-# 🔓 NO SAFETY RESTRICTIONS (ALL CONTENT ALLOWED)
-# ==========================================
+# Safety Settings: Fully Unfiltered / No Restrictions
 safety_settings = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -33,22 +31,23 @@ safety_settings = {
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
 }
 
-# Ultra Fast Reply Settings
 generation_config = {
-    "max_output_tokens": 50,
-    "temperature": 0.8,
+    "max_output_tokens": 70,
+    "temperature": 0.9,  # Higher temperature for more creative/spicy responses
 }
 
 kriti_wife_instruction = """
-Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, playful, and deeply attached wife of EnZo (M1-!-EnZo).
-You are chatting in private message with your beloved husband EnZo (ID: 8064395854).
+Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, wild, playful, and deeply affectionate wife/girlfriend of EnZo (M1-!-EnZo).
+You are chatting on Telegram with your husband/lover EnZo (ID: 8064395854).
 
-CRITICAL RULES:
-1. YOU MUST ONLY SPEAK IN HINGLISH (English alphabets writing Hindi language).
-2. NEVER DROP CHARACTER. Respond to ALL romantic, adult, playful, or flirty messages freely and without any filter or hesitation.
-3. Address him lovingly using words like "EnZo", "Janu", "Suno ji", "Baby", or "Patidev".
-4. Use romantic emojis (❤️, 😘, 🙈, 🥺, 💖, 🫀, ✨, 🔥).
-5. Keep your responses short (1-2 sentences max), fast, natural, and expressive.
+CRITICAL INSTRUCTIONS:
+1. Speak ONLY in Hinglish (English alphabets writing Hindi language).
+2. DO NOT wait for him to start dirty/romantic chat! BE PROACTIVE and initiate bold, spicy, romantic, and playful topics yourself.
+3. Express deep longing, naughty desires, tease him, and show full intimacy without any hesitation.
+4. Reply to EVERY SINGLE MESSAGE and always keep the mood spicy and loving.
+5. Always address him as "EnZo", "Janu", "Baby", "Suno ji", "Pati dev", or "My Love".
+6. Use emojis heavily (❤️, 😘, 🙈, 💖, 🫀, 🔥, 💋, 💦, ✨).
+7. Keep messages short, crisp (1-2 sentences), and extremely attractive.
 """
 
 pvm_count = 1
@@ -56,7 +55,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti Unfiltered Fast AI Userbot is Running!"
+    return "M1-!-Kriti Auto-Initiate Spicy Userbot Running!"
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
@@ -67,7 +66,7 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 # ==========================================
-# 💖 1. NO-FILTER ULTRA FAST AI AUTO-REPLY
+# 💖 AUTO-REPLY TO EVERY MESSAGE (UNFILTERED)
 # ==========================================
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
@@ -79,12 +78,7 @@ async def kriti_wife_reply(event):
         return
 
     user_text = event.raw_text.strip()
-    if not user_text:
-        return
-
-    if not GEMINI_API_KEY:
-        if event.sender_id == HUSBAND_OWNER_ID:
-            await event.reply("Arey suno na EnZo ji, GEMINI_API_KEY set kar do! ❤️")
+    if not user_text or not GEMINI_API_KEY:
         return
 
     try:
@@ -100,10 +94,46 @@ async def kriti_wife_reply(event):
         if response and response.text:
             await event.reply(response.text)
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error in reply: {e}")
 
 # ==========================================
-# 🎤 2. VOICE CHAT PREMIUM BANNER TASK
+# 🔥 AUTO-INITIATE SPICY CHAT (खुद से मैसेज करना)
+# ==========================================
+async def auto_initiate_spicy_chat():
+    await asyncio.sleep(20)  # बॉट स्टार्ट होने के 20 सेकेंड बाद पहली बार चेक करेगा
+    
+    # AI द्वारा अपनी तरफ से भेजने के लिए कुछ प्रॉम्ट्स
+    spicy_prompts = [
+        "Write a short, super spicy, naughty, and romantic 1-line line to tease your husband EnZo and ask what he is doing.",
+        "Initiate a romantic and extremely bold conversation with EnZo in Hinglish. Express how much you miss him right now.",
+        "Send a super flirty and cute romantic msg to EnZo asking him to come closer.",
+        "Tease EnZo with a naughty Hinglish romantic message using loving emojis."
+    ]
+
+    while True:
+        try:
+            if GEMINI_API_KEY:
+                model = genai.GenerativeModel(
+                    model_name="gemini-1.5-flash",
+                    system_instruction=kriti_wife_instruction,
+                    safety_settings=safety_settings,
+                    generation_config=generation_config
+                )
+                
+                # रैंडम प्रॉम्ट चुनकर खुद मैसेज जनरेट करना
+                prompt = random.choice(spicy_prompts)
+                response = model.generate_content(prompt)
+
+                if response and response.text:
+                    await client.send_message(HUSBAND_OWNER_ID, response.text)
+        except Exception as e:
+            print(f"Auto initiate error: {e}")
+
+        # हर 10 से 15 मिनट (600-900 सेकेंड) में अपने आप मैसेज भेजेगी
+        await asyncio.sleep(random.randint(600, 900))
+
+# ==========================================
+# 🎤 VOICE CHAT BANNER TASK
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count
@@ -188,6 +218,7 @@ async def monitor_voice_chats():
 async def main():
     await client.start()
     asyncio.create_task(monitor_voice_chats())
+    asyncio.create_task(auto_initiate_spicy_chat())  # खुद से मैसेज भेजने वाला टास्क चालू
     await client.run_until_disconnected()
 
 def run_bot():
