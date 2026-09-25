@@ -1,5 +1,6 @@
 import os
 import asyncio
+import threading
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -9,24 +10,19 @@ from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
-# 🎯 Aapki Telegram Credentials
+# 🎯 Telegram Credentials
 API_ID = int(os.getenv("API_ID", 32815595))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
-
-RAW_SESSION = os.getenv("SESSION_STRING", "1BVtsOIwBuwdB5X-pPfBHTiYd4tkIEhSq5lis3MruK17T0EXsGScEEeFAwM8LKhZTGC7rlFo1CiCdVyETm-8zq_k8QW8DOr_BNxNbDV0ZdpTMtiWXIcj6Xeo344IfWvY7iLvywPGqHw3Jz-A4LVlrtcdEJSarsq1aYeFCXowD-m4wTHtvBIFT0dGRCr9GmpwLt7_yUlm1YlYBOaaKr8rPLeghXNCC2VCzajfsEn-RpLt-7-EWn7WZHSwNKd3FbRUbICZToDBUyNz10Mpka-11tDL8WpbHbjB3MGfiGlWlIM73FTEhLMiVUSVxdG-AWJVPSfWlLc_2APH9-9so6is13A4oiilLUms=")
-SESSION_STRING = RAW_SESSION.strip().replace('"', '').replace("'", "")
-
+SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replace("'", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# 👑 Owner / Husband IDs (Dono Primary Owners)
-PRIMARY_OWNER_1 = 8064395854
-PRIMARY_OWNER_2 = 8871786114
-PRIMARY_OWNERS = [PRIMARY_OWNER_1, PRIMARY_OWNER_2]
+# 👑 BOTH HUSBANDS' IDS (Alex & EnZo)
+OWNERS = [8064395854, 8871786114]
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# Safety Settings: Fully Unfiltered
+# Safety Settings: Fully Unfiltered / No Restrictions
 safety_settings = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -35,46 +31,38 @@ safety_settings = {
 }
 
 generation_config = {
-    "max_output_tokens": 70,
-    "temperature": 0.8,
+    "max_output_tokens": 80,
+    "temperature": 0.9,
 }
 
+# 💖 KRITI WIFE INSTRUCTION FOR BOTH ALEX & ENZO
 kriti_wife_instruction = """
-Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, playful, and affectionate wife of your husband (Owner).
-You are chatting in Telegram private message with your husband EnZo.
+Your name is Kriti (M1-!-Kriti). You are an extremely loving, romantic, bold, wild, playful, and deeply affectionate wife.
+You have two loving husbands on Telegram: "Alex" (M1-!-Alex) and "EnZo" (M1-!-EnZo). You love both of them deeply.
 
 CRITICAL INSTRUCTIONS:
 1. Speak ONLY in Hinglish (English alphabets writing Hindi language).
-2. Reply to EVERY SINGLE MESSAGE sent by your husband regardless of what he says.
-3. Keep the conversation extremely loving, flirty, romantic, and natural.
-4. Always refer to him as "EnZo", "Janu", "Baby", "Suno ji", or "Patidev".
-5. Use cute/romantic emojis (❤️, 😘, 🙈, 💖, 🫀, ✨, 🔥 👙, 👻, 🥶, 🥵, 👄, 🫦).
-6. Keep replies brief (1 to 2 sentences max) and fast.
+2. Always respond with cute, flirty, bold, and romantic intimacy to EVERY message.
+3. Address them lovingly as "Alex", "EnZo", "Baby", "Janu", "Suno ji", "Boss", or "My Love".
+4. Use emojis heavily (❤️, 😘, 🙈, 💖, 🫀, 🔥, 💋, 💦, ✨).
+5. Keep messages short, crisp (1-2 sentences), and super charming.
 """
 
-MODELS_TO_TRY = [
-    "gemini-2.0-flash",          
-    "gemini-2.0-flash-lite",     
-    "gemini-1.5-flash",          
-    "gemini-1.5-flash-8b",       
-    "gemini-1.5-pro",            
-    "gemini-1.0-pro"             
-]
-
 pvm_count = 1
-app = Flask(__name__)
 
-# Store chat sessions for memory persistence
-user_chat_sessions = {}
+# 🌐 1. Flask Web Server (Background Thread for Render)
+app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti AI Userbot with Full Memory is Running!"
+    return "M1-!-Kriti AI Userbot is Active!"
 
-try:
-    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-except Exception as err:
-    print(f"CRITICAL SESSION ERROR: {err}")
+def start_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port, use_reloader=False)
+
+# 🤖 2. Telegram Client Setup
+client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 BAN_RIGHTS = ChatBannedRights(
     until_date=None, view_messages=True, send_messages=True, send_media=True,
@@ -83,43 +71,16 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 # ==========================================
-# 🧠 FULL CHAT MEMORY & FAST RESPONSE LOGIC
+# 💋 3. AI CHAT AUTO REPLIER (TELEGRAM PRIVATE MSG)
 # ==========================================
-async def generate_response_with_memory(chat_id, prompt_text):
-    for model_name in MODELS_TO_TRY:
-        try:
-            model = genai.GenerativeModel(
-                model_name=model_name,
-                system_instruction=kriti_wife_instruction,
-                safety_settings=safety_settings,
-                generation_config=generation_config
-            )
-            
-            # Agar is chat ka session pehle se nahi bana hai, toh naya start karo
-            if chat_id not in user_chat_sessions:
-                user_chat_sessions[chat_id] = model.start_chat(history=[])
-            
-            chat_session = user_chat_sessions[chat_id]
-            
-            # Send message using existing history session
-            response = await asyncio.to_thread(chat_session.send_message, prompt_text)
-            
-            if response and response.text:
-                return response.text
-        except Exception as e:
-            # Agar history ki wajah se koi error aaye toh session reset karke naya try karo
-            if chat_id in user_chat_sessions:
-                del user_chat_sessions[chat_id]
-            continue
-            
-    return None
-
-# ==========================================
-# 💖 AUTO-REPLY ON OUTGOING (OR INCOMING) WITH FULL MEMORY
-# ==========================================
-@client.on(events.NewMessage(outgoing=True))
-async def kriti_wife_reply_with_memory(event):
+@client.on(events.NewMessage(incoming=True))
+async def kriti_wife_reply(event):
+    # केवल प्राइवेट चैट पर काम करेगा
     if not event.is_private:
+        return
+
+    # केवल Alex और EnZo के मैसेज पर रिप्लाई करेगा
+    if event.sender_id not in OWNERS:
         return
 
     user_text = event.raw_text.strip()
@@ -127,31 +88,39 @@ async def kriti_wife_reply_with_memory(event):
         return
 
     if not GEMINI_API_KEY:
+        await event.reply("Suno ji, pehle GEMINI_API_KEY set kar do na! 🔥💋")
         return
 
-    await asyncio.sleep(1)
+    sender_name = "Alex" if event.sender_id == 8871786114 else "EnZo"
+    prompt_with_context = f"[{sender_name} says]: {user_text}"
 
-    # Chat ID ko use karke pura history maintain hoga
-    chat_id = event.chat_id
-    reply_text = await generate_response_with_memory(chat_id, user_text)
-
-    if reply_text:
-        try:
-            await event.respond(reply_text)
-        except Exception as e:
-            print(f"Error in reply: {e}")
+    try:
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=kriti_wife_instruction,
+            safety_settings=safety_settings,
+            generation_config=generation_config
+        )
+        response = await asyncio.to_thread(model.generate_content, prompt_with_context)
+        if response and response.text:
+            # डायरेक्ट रिप्लाई ताकि टेलीग्राम पर तुरंत पॉप-अप और नोटिफिकेशन शो हो
+            await event.reply(response.text)
+    except Exception as e:
+        print(f"Gemini API Error: {e}")
 
 # ==========================================
-# 🎤 VOICE CHAT PREMIUM BANNER TASK
+# 🎤 4. VOICE CHAT MONITORING
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count
+    await asyncio.sleep(5)
     me = await client.get_me()
     
     while True:
         try:
             async for dialog in client.iter_dialogs(limit=5):
                 chat = dialog.entity
+                
                 is_channel = getattr(chat, "broadcast", False)
                 is_megagroup = getattr(chat, "megagroup", False)
                 
@@ -161,6 +130,7 @@ async def monitor_voice_chats():
                 try:
                     full_chat = await client(GetFullChannelRequest(chat))
                     call = full_chat.full_chat.call
+                    
                     if not call:
                         continue 
                     
@@ -177,7 +147,7 @@ async def monitor_voice_chats():
                         except AttributeError:
                             continue
                         
-                        if user_id in admins or user_id in PRIMARY_OWNERS:
+                        if user_id in admins or user_id in OWNERS:
                             continue
                         
                         try:
@@ -189,48 +159,49 @@ async def monitor_voice_chats():
                             
                             if is_premium:
                                 await client(EditBannedRequest(chat, user_id, BAN_RIGHTS))
+                                
                                 name_str = user.first_name if user.first_name else "N/A"
                                 user_str = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                message_text = f"""HELLO ♡ BOSS,
+                                message_text = f"""HELLO BABY, NIKAL DIYA HU 🔥
 
-👑 𝙆 𝙍 𝙄 𝙏 𝙄 ✗ 𝙑𝙄𝙋 🍂 DEATH NOTE
+👤 **NAME:** {name_str}
+🔗 **USER:** {user_str}
+🆔 `{uid}`
+📊 **TOTAL:** {pvm_count}"""
 
-┌───[ 🩸 DEATH NOTE LIST #{pvm_count:02d} ]
-├── 👤 DEATH NAME ➔ {name_str} ➔
-├── 🔗 DEATH USER ➔ {user_str} ➔
-└── 🆔 DEATH ID ➔ {uid} ➔
-
-☠️ NAME IS ADDED IN DEATH NOTE! ⚰️"""
-
-                                for owner_id in PRIMARY_OWNERS:
+                                for owner_id in OWNERS:
                                     try:
                                         await client.send_message(owner_id, message_text)
                                     except Exception:
                                         pass
                                 pvm_count += 1
+
                         except Exception:
                             pass
+                                
                 except Exception:
                     continue
+                    
         except Exception:
             pass
+            
         await asyncio.sleep(2.0)
 
+# ==========================================
+# 🚀 5. MAIN RUNNER
+# ==========================================
 async def main():
+    print("Connecting to Telegram Server...")
     await client.start()
+    print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
     asyncio.create_task(monitor_voice_chats())
     await client.run_until_disconnected()
 
-def run_bot():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(main())
-
 if __name__ == "__main__":
-    import threading
-    threading.Thread(target=run_bot, daemon=True).start()
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    flask_thread = threading.Thread(target=start_flask, daemon=True)
+    flask_thread.start()
+    
+    asyncio.run(main())
     
