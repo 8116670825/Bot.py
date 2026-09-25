@@ -22,16 +22,6 @@ generation_config = {
     "temperature": 0.9,
 }
 
-# 🔄 Gemini Models List: From Gemini 1.0 (2023) up to Gemini 3.8 (2026)
-GEMINI_MODELS_FALLBACK = [
-    "gemini-3.8-flash",     # 2026 Latest
-    "gemini-2.5-flash",     # 2025/2026 Advanced
-    "gemini-2.0-flash",     # 2025 Stable Flash
-    "gemini-1.5-flash",     # 2024 Popular Fast
-    "gemini-1.5-pro",       # 2024 Pro
-    "gemini-1.0-pro"        # 2023 Original First Gen Pro
-]
-
 # 🔥 फुल ठड़कपंती और बोल्ड, रोमांटिक अंदाज़ वाला प्रॉम्प्ट
 kriti_wife_instruction = """
 Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, wild, playful, hot, and affectionate wife/girlfriend of EnZo (M1-!-EnZo) and Alex (M1-!-Alex).
@@ -53,7 +43,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti Ultimate AI Server Active & Running with Full Model Fallback!"
+    return "M1-!-Kriti Ultimate AI Server Active & Running!"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -92,32 +82,27 @@ async def kriti_wife_reply(event):
 
         reply_text = ""
         async with client.action(event.chat_id, 'typing'):
-            genai.configure(api_key=api_key)
-            
-            # 🔄 Loop through all models from 3.8 down to 1.0 to find working one
-            for model_name in GEMINI_MODELS_FALLBACK:
-                try:
-                    model = genai.GenerativeModel(
-                        model_name=model_name,
-                        system_instruction=kriti_wife_instruction,
-                        generation_config=generation_config
-                    )
-                    
-                    response = await asyncio.wait_for(model.generate_content_async(user_text), timeout=10.0)
-                    
-                    if response and response.text:
-                        reply_text = response.text.strip()
-                        break # Successful response mila toh loop tod do
-                except Exception as model_err:
-                    print(f"⚠️ Model {model_name} failed: {model_err}")
-                    continue
+            try:
+                genai.configure(api_key=api_key)
+                # यहाँ एकदम सही और स्टेबल मॉडल नाम का इस्तेमाल किया है
+                model = genai.GenerativeModel(
+                    model_name="gemini-1.5-flash",
+                    system_instruction=kriti_wife_instruction,
+                    generation_config=generation_config
+                )
+                
+                response = await asyncio.wait_for(model.generate_content_async(user_text), timeout=15.0)
+                
+                if response and response.text:
+                    reply_text = response.text.strip()
+            except Exception as inner_e:
+                print(f"⚠️ API Error caught: {inner_e}")
+                reply_text = f"Suno ji, API mein yeh error aa raha hai: {str(inner_e)} 🥶"
             
             await asyncio.sleep(0.3)
 
         if reply_text:
             await event.reply(reply_text)
-        else:
-            await event.reply("Suno ji, abhi sare models try kar liye par network issue hai, par main yahin hoon na tumhare paas! 🥵💋")
             
     except Exception as outer_e:
         print(f"❌ Critical error: {outer_e}")
