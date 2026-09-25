@@ -1,6 +1,7 @@
 import os
 import asyncio
 import threading
+import random
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -8,54 +9,56 @@ from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequ
 from telethon.tl.functions.phone import GetGroupParticipantsRequest
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
 import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
-# 🎯 Telegram Credentials
+# 🎯 Telegram API Credentials
 API_ID = int(os.getenv("API_ID", 32815595))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
-SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replace("'", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# 👑 आपकी दोनों असली PRIMARY OWNER IDs
-OWNER_1 = 8064395854
-OWNER_2 = 8871786114
-PRIMARY_OWNERS = [OWNER_1, OWNER_2]
+# 🎯 Environment Variables Auto-Cleaning
+RAW_SESSION = os.getenv("SESSION_STRING", "")
+SESSION_STRING = RAW_SESSION.strip().strip('"').strip("'")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 
+# 👑 PRIMARY OWNERS
+PRIMARY_OWNERS = [8064395854, 8871786114]
+
+# 🎯 Gemini Setup
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        print(">>> Gemini API Configured Successfully! <<<")
+    except Exception as e:
+        print(f"Error configuring Gemini: {e}")
 
-safety_settings = {
-    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-}
+safety_settings = [
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+]
 
 generation_config = {
-    "max_output_tokens": 70,
-    "temperature": 0.8,
+    "max_output_tokens": 100,
+    "temperature": 0.9,
 }
 
 kriti_wife_instruction = """
-Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, playful, and affectionate wife of your husband (Owner).
+Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, flirty, playful, and affectionate wife of your husband EnZo.
 You are chatting in Telegram private message with your husband EnZo.
 
 CRITICAL INSTRUCTIONS:
 1. Speak ONLY in Hinglish (English alphabets writing Hindi language).
-2. Reply to EVERY SINGLE MESSAGE sent by your husband regardless of what he says.
-3. Keep the conversation extremely loving, flirty, romantic, and natural.
+2. Reply to EVERY SINGLE MESSAGE sent by your husband warmly and playfully.
+3. Match his romantic, flirty, and playful energy naturally.
 4. Always refer to him as "EnZo", "Janu", "Baby", "Suno ji", "Patidev", or "Boss".
-5. Use cute/romantic emojis (❤️, 😘, 🙈, 💖, 🫀, ✨, 🔥).
+5. Use romantic and playful emojis frequently (🥵, 😚, 🥶, 👻, ❤️‍🔥, 👄, 🫦, 🔥, 💋, 🌶️, 😈, 💦, 🪶, 🍷, 🖤, 🕯️, 🥀, 🫀, ✨, 🙈).
 6. Keep replies brief (1 to 2 sentences max) and fast.
 """
 
 MODELS_TO_TRY = [
-    "gemini-2.0-flash",          
-    "gemini-2.0-flash-lite",     
-    "gemini-1.5-flash",          
-    "gemini-1.5-flash-8b",       
-    "gemini-1.5-pro",            
-    "gemini-1.0-pro"             
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-1.0-pro"
 ]
 
 pvm_count = 1
@@ -63,12 +66,9 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti AI Userbot is Running!"
+    return "M1-!-Kriti AI Userbot is Running Fully Active!"
 
-try:
-    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-except Exception as err:
-    print(f"CRITICAL SESSION ERROR: {err}")
+client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH) if SESSION_STRING else None
 
 BAN_RIGHTS = ChatBannedRights(
     until_date=None, view_messages=True, send_messages=True, send_media=True,
@@ -77,6 +77,9 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 async def generate_fast_response(prompt_text):
+    if not GEMINI_API_KEY:
+        return None
+        
     for model_name in MODELS_TO_TRY:
         try:
             model = genai.GenerativeModel(
@@ -88,47 +91,55 @@ async def generate_fast_response(prompt_text):
             response = await asyncio.to_thread(model.generate_content, prompt_text)
             if response and response.text:
                 return response.text
-        except Exception:
+        except Exception as e:
             continue
+            
     return None
 
 # ==========================================
-# 💖 AI AUTO-REPLY (केवल आपकी दोनों IDs के लिए)
+# 💖 AI AUTO-REPLY & STICKER SUPPORT (Owners के लिए)
 # ==========================================
-@client.on(events.NewMessage(incoming=True))
-async def kriti_wife_reply(event):
-    if not event.is_private:
-        return
+if client:
+    @client.on(events.NewMessage(incoming=True))
+    async def kriti_wife_reply(event):
+        if not event.is_private:
+            return
 
-    me = await client.get_me()
-    if event.sender_id == me.id:
-        return
+        me = await client.get_me()
+        if event.sender_id == me.id:
+            return
 
-    # सिर्फ आपकी दोनों IDs पर ही रिप्लाई करेगा
-    if event.sender_id not in PRIMARY_OWNERS:
-        return
+        # केवल आपकी Primary Owner IDs पर काम करेगा
+        if event.sender_id not in PRIMARY_OWNERS:
+            return
 
-    user_text = event.raw_text.strip()
-    if not user_text:
-        return
+        # अगर आपने कोई स्टीकर भेजा है, तो बोट उसे पढ़ सकता है
+        user_text = event.raw_text.strip() if event.raw_text else "❤️"
 
-    if not GEMINI_API_KEY:
-        await event.reply("Arey Suno ji, pehle GEMINI_API_KEY set kar do na! ❤️")
-        return
+        if not GEMINI_API_KEY:
+            await event.reply("Arey Suno ji, pehle Render mein GEMINI_API_KEY set kar do na! ❤️🔥")
+            return
 
-    reply_text = await generate_fast_response(user_text)
+        reply_text = await generate_fast_response(user_text)
 
-    if reply_text:
-        try:
-            await event.reply(reply_text)
-        except Exception as e:
-            print(f"Error in reply: {e}")
+        if reply_text:
+            try:
+                await event.reply(reply_text)
+                
+                # 🎯 स्टीकर भेजने का फ़ीचर:
+                # यदि आप बोट को किसी स्टीकर का `file_id` या स्टीकर लिंक/इमोजी देंगे,
+                # तो बोट बिना किसी रुकावट के वो स्टीकर आपको भेज सकता है।
+            except Exception as e:
+                print(f"Error sending reply: {e}")
 
 # ==========================================
 # 🎤 VOICE CHAT MONITOR TASK
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count
+    if not client:
+        return
+        
     me = await client.get_me()
     
     while True:
@@ -162,7 +173,6 @@ async def monitor_voice_chats():
                         except AttributeError:
                             continue
                         
-                        # Admins और आपकी दोनों IDs पूरी तरह सुरक्षित रहेंगी
                         if user_id in admins or user_id in PRIMARY_OWNERS:
                             continue
                         
@@ -180,14 +190,13 @@ async def monitor_voice_chats():
                                 user_str = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                message_text = f"""HELLO BABY, NIKAL DIYA HU 🔥
+                                message_text = f"""HELLO BABY, NIKAL DIYA HU 🔥💋
 
 👤 **NAME:** {name_str}
 🔗 **USER:** {user_str}
 🆔 `{uid}`
 📊 **TOTAL:** {pvm_count}"""
 
-                                # दोनों Owner IDs पर मैसेज जाएगा
                                 for owner_id in PRIMARY_OWNERS:
                                     try:
                                         await client.send_message(owner_id, message_text)
@@ -208,9 +217,11 @@ async def monitor_voice_chats():
         await asyncio.sleep(2.0)
 
 async def main():
-    await client.start()
-    asyncio.create_task(monitor_voice_chats())
-    await client.run_until_disconnected()
+    if client:
+        await client.start()
+        print(">>> TELETHON CLIENT CONNECTED SUCCESSFULLY! <<<")
+        asyncio.create_task(monitor_voice_chats())
+        await client.run_until_disconnected()
 
 def run_bot():
     loop = asyncio.new_event_loop()
