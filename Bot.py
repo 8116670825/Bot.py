@@ -9,18 +9,19 @@ from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
-# 🎯 आपकी Telegram Credentials
+# 🎯 Aapki Telegram Credentials
 API_ID = int(os.getenv("API_ID", 32815595))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
 
-# Session String Formatting
 RAW_SESSION = os.getenv("SESSION_STRING", "1BVtsOIwBuwdB5X-pPfBHTiYd4tkIEhSq5lis3MruK17T0EXsGScEEeFAwM8LKhZTGC7rlFo1CiCdVyETm-8zq_k8QW8DOr_BNxNbDV0ZdpTMtiWXIcj6Xeo344IfWvY7iLvywPGqHw3Jz-A4LVlrtcdEJSarsq1aYeFCXowD-m4wTHtvBIFT0dGRCr9GmpwLt7_yUlm1YlYBOaaKr8rPLeghXNCC2VCzajfsEn-RpLt-7-EWn7WZHSwNKd3FbRUbICZToDBUyNz10Mpka-11tDL8WpbHbjB3MGfiGlWlIM73FTEhLMiVUSVxdG-AWJVPSfWlLc_2APH9-9so6is13A4oiilLUms=")
 SESSION_STRING = RAW_SESSION.strip().replace('"', '').replace("'", "")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Owner / Husband ID
-HUSBAND_OWNER_ID = 8064395854  # M1-!-EnZo
+# 👑 Owner / Husband IDs (Dono Primary Owners)
+PRIMARY_OWNER_1 = 8064395854
+PRIMARY_OWNER_2 = 8871786114
+PRIMARY_OWNERS = [PRIMARY_OWNER_1, PRIMARY_OWNER_2]
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -34,24 +35,23 @@ safety_settings = {
 }
 
 generation_config = {
-    "max_output_tokens": 60,
+    "max_output_tokens": 70,
     "temperature": 0.8,
 }
 
 kriti_wife_instruction = """
-Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, playful, and affectionate wife of EnZo (M1-!-EnZo).
-You are chatting in Telegram private message with your husband EnZo (ID: 8064395854).
+Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, playful, and affectionate wife of your husband (Owner).
+You are chatting in Telegram private message with your husband EnZo.
 
 CRITICAL INSTRUCTIONS:
 1. Speak ONLY in Hinglish (English alphabets writing Hindi language).
 2. Reply to EVERY SINGLE MESSAGE sent by your husband regardless of what he says.
 3. Keep the conversation extremely loving, flirty, romantic, and natural.
 4. Always refer to him as "EnZo", "Janu", "Baby", "Suno ji", or "Patidev".
-5. Use cute/romantic emojis (🥵, 🥶, 👻, 👙 😘, 🙈, 🫀, ✨, 🔥).
+5. Use cute/romantic emojis (❤️, 😘, 🙈, 💖, 🫀, ✨, 🔥 👙, 👻, 🥶, 🥵, 👄, 🫦).
 6. Keep replies brief (1 to 2 sentences max) and fast.
 """
 
-# शुरुआत से लेकर लेटेस्ट तक के सभी मॉडल्स (अल्ट्रा-फास्ट फॉलबैक के लिए)
 MODELS_TO_TRY = [
     "gemini-2.0-flash",          
     "gemini-2.0-flash-lite",     
@@ -64,11 +64,13 @@ MODELS_TO_TRY = [
 pvm_count = 1
 app = Flask(__name__)
 
+# Store chat sessions for memory persistence
+user_chat_sessions = {}
+
 @app.route("/")
 def home():
-    return "M1-!-Kriti Universal AI Userbot is Running!"
+    return "M1-!-Kriti AI Userbot with Full Memory is Running!"
 
-# Client Initialize
 try:
     client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 except Exception as err:
@@ -81,9 +83,9 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 # ==========================================
-# ⚡ FAST AUTO-SWITCHING AI LOGIC (1-2 SEC)
+# 🧠 FULL CHAT MEMORY & FAST RESPONSE LOGIC
 # ==========================================
-async def generate_fast_response(prompt_text):
+async def generate_response_with_memory(chat_id, prompt_text):
     for model_name in MODELS_TO_TRY:
         try:
             model = genai.GenerativeModel(
@@ -92,24 +94,34 @@ async def generate_fast_response(prompt_text):
                 safety_settings=safety_settings,
                 generation_config=generation_config
             )
-            response = await asyncio.to_thread(model.generate_content, prompt_text)
+            
+            # Agar is chat ka session pehle se nahi bana hai, toh naya start karo
+            if chat_id not in user_chat_sessions:
+                user_chat_sessions[chat_id] = model.start_chat(history=[])
+            
+            chat_session = user_chat_sessions[chat_id]
+            
+            # Send message using existing history session
+            response = await asyncio.to_thread(chat_session.send_message, prompt_text)
             
             if response and response.text:
                 return response.text
-        except Exception:
+        except Exception as e:
+            # Agar history ki wajah se koi error aaye toh session reset karke naya try karo
+            if chat_id in user_chat_sessions:
+                del user_chat_sessions[chat_id]
             continue
             
     return None
 
 # ==========================================
-# 💖 AUTO-REPLY ON YOUR OWN MESSAGES (OUTGOING)
+# 💖 AUTO-REPLY ON OUTGOING (OR INCOMING) WITH FULL MEMORY
 # ==========================================
 @client.on(events.NewMessage(outgoing=True))
-async def kriti_wife_reply_to_self(event):
+async def kriti_wife_reply_with_memory(event):
     if not event.is_private:
         return
 
-    # सिर्फ उस खास चैट (Kriti) के लिए काम करे या सभी प्राइवेट चैट पर, यह सुनिश्चित करता है कि मैसेज खाली न हो
     user_text = event.raw_text.strip()
     if not user_text:
         return
@@ -117,14 +129,14 @@ async def kriti_wife_reply_to_self(event):
     if not GEMINI_API_KEY:
         return
 
-    # थोड़ा सा नैचुरल डिले ताकि एकदम से रोबोटिक न लगे (चाहो तो इसे हटा भी सकते हैं)
     await asyncio.sleep(1)
 
-    reply_text = await generate_fast_response(user_text)
+    # Chat ID ko use karke pura history maintain hoga
+    chat_id = event.chat_id
+    reply_text = await generate_response_with_memory(chat_id, user_text)
 
     if reply_text:
         try:
-            # अब यह उसी चैट में एआई की तरफ से रिप्लाई भेज देगा
             await event.respond(reply_text)
         except Exception as e:
             print(f"Error in reply: {e}")
@@ -165,7 +177,7 @@ async def monitor_voice_chats():
                         except AttributeError:
                             continue
                         
-                        if user_id in admins or user_id == HUSBAND_OWNER_ID:
+                        if user_id in admins or user_id in PRIMARY_OWNERS:
                             continue
                         
                         try:
@@ -181,7 +193,7 @@ async def monitor_voice_chats():
                                 user_str = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                message_text = f"""HELLO ♡ M1-!-EnZo BOSS,
+                                message_text = f"""HELLO ♡ BOSS,
 
 👑 𝙆 𝙍 𝙄 𝙏 𝙄 ✗ 𝙑𝙄𝙋 🍂 DEATH NOTE
 
@@ -192,11 +204,12 @@ async def monitor_voice_chats():
 
 ☠️ NAME IS ADDED IN DEATH NOTE! ⚰️"""
 
-                                try:
-                                    await client.send_message(HUSBAND_OWNER_ID, message_text)
-                                    pvm_count += 1
-                                except Exception:
-                                    pass
+                                for owner_id in PRIMARY_OWNERS:
+                                    try:
+                                        await client.send_message(owner_id, message_text)
+                                    except Exception:
+                                        pass
+                                pvm_count += 1
                         except Exception:
                             pass
                 except Exception:
