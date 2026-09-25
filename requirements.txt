@@ -1,5 +1,3 @@
-telethon
 Flask
-google-generativeai
-Pillow
-gunicorn
+Telethon
+google-genai
