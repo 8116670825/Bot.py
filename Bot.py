@@ -22,7 +22,7 @@ generation_config = {
     "temperature": 0.9,
 }
 
-# 🔥 फुल ठड़कपंती और बोल्ड, रोमांटिक अंदाज़ वाला प्रॉम्प्ट (बिना किसी रुकावट के)
+# 🔥 फुल ठड़कपंती और बोल्ड, रोमांटिक अंदाज़ वाला प्रॉम्प्ट
 kriti_wife_instruction = """
 Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, wild, playful, hot, and affectionate wife/girlfriend of EnZo (M1-!-EnZo) and Alex (M1-!-Alex).
 You are chatting in Telegram private message with your husbands.
@@ -38,7 +38,7 @@ CORE BEHAVIOR RULES:
 
 pvm_count = 1
 
-# 🌐 1. Flask Web Server (Render ke liye)
+# 🌐 1. Flask Web Server
 app = Flask(__name__)
 
 @app.route("/")
@@ -58,13 +58,9 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
-# ==========================================
-# 💖 UNRESTRICTED & SYNCED AI HANDLER FOR PM
-# ==========================================
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
     try:
-        # सिर्फ प्राइवेट चैट के लिए काम करेगा
         if not event.is_private:
             return
 
@@ -72,7 +68,6 @@ async def kriti_wife_reply(event):
         if event.sender_id == me.id:
             return
 
-        # सिर्फ ओनर आईडी के मैसेज चेक होंगे
         if event.sender_id not in HUSBAND_OWNER_IDS:
             return
 
@@ -80,16 +75,14 @@ async def kriti_wife_reply(event):
         if not user_text:
             return
 
-        # नए AQ. / AI स्टूडियो की को फेच करना
         api_key = os.getenv("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
         if not api_key:
-            print("⚠️ GEMINI_API_KEY missing in Environment Variables!")
+            await event.reply("⚠️ Error: GEMINI_API_KEY environment variable missing hai Render mein!")
             return
 
         reply_text = ""
         async with client.action(event.chat_id, 'typing'):
             try:
-                # नए सर्वर और मॉडल के साथ कॉन्फ़िगरेशन
                 genai.configure(api_key=api_key)
                 model = genai.GenerativeModel(
                     model_name="gemini-1.5-flash",
@@ -102,19 +95,20 @@ async def kriti_wife_reply(event):
                 if response and response.text:
                     reply_text = response.text.strip()
             except Exception as inner_e:
-                print(f"⚠️ Gemini API Error caught safely: {inner_e}")
+                # अब जो असली एरर होगा, वो सीधा चैट में लिखकर आ जाएगा ताकि हमें तुरंत पता चले!
+                reply_text = f"⚠️ API Error: {str(inner_e)}"
             
             await asyncio.sleep(0.3)
 
         if reply_text:
             await event.reply(reply_text)
         else:
-            await event.reply("Suno ji, network thoda down hai par main yahin hoon na! 🥵💋")
+            await event.reply("Suno ji, kuch gadbad hai response nahi mila! 🥶")
             
     except Exception as outer_e:
-        print(f"❌ Critical error in message handler: {outer_e}")
+        print(f"❌ Critical error: {outer_e}")
 
-# 🎤 VOICE CHAT MONITOR TASK (Background Worker)
+# 🎤 VOICE CHAT MONITOR TASK
 async def monitor_voice_chats():
     global pvm_count
     await asyncio.sleep(5)
@@ -191,7 +185,6 @@ async def main():
     await client.start()
     print(">>> TELEGRAM CLIENT CONNECTED & READY! <<<")
     
-    # ओनर के साथ चैट का एंटिटी सिंक करना ताकि मैसेज मिस न हो
     for owner_id in HUSBAND_OWNER_IDS:
         try:
             await client.get_entity(owner_id)
