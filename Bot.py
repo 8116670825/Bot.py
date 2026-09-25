@@ -1,7 +1,6 @@
 import os
 import asyncio
 import threading
-import random
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -9,69 +8,62 @@ from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequ
 from telethon.tl.functions.phone import GetGroupParticipantsRequest
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
-# 🎯 Telegram API Credentials
+# 🎯 Telegram Credentials (Render Environment Variables)
 API_ID = int(os.getenv("API_ID", 32815595))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
+SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replace("'", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# 🎯 Environment Variables Auto-Cleaning
-RAW_SESSION = os.getenv("SESSION_STRING", "")
-SESSION_STRING = RAW_SESSION.strip().strip('"').strip("'")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+# 👑 Both Husband / Owner IDs
+HUSBAND_OWNER_IDS = [8064395854, 8871786114]
 
-# 👑 PRIMARY OWNERS
-PRIMARY_OWNERS = [8064395854, 8871786114]
-HUSBAND_MAIN_ID = 8064395854  # मेन पति की आईडी जिस पर ऑटो-मैसेज जाएंगे
-
-# 🎯 Gemini Setup
 if GEMINI_API_KEY:
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        print(">>> Gemini API Configured Successfully! <<<")
-    except Exception as e:
-        print(f"Error configuring Gemini: {e}")
+    genai.configure(api_key=GEMINI_API_KEY)
 
-# 🔥 नो-सेंसरशिप / नो-ब्लॉक सुरक्षा सेटिंग्स (AI कभी मना नहीं करेगा)
-safety_settings = [
-    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-]
-
-generation_config = {
-    "max_output_tokens": 150,
-    "temperature": 0.95,
+# Safety Settings: Fully Unfiltered / No Restrictions
+safety_settings = {
+    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
 }
 
+generation_config = {
+    "max_output_tokens": 70,
+    "temperature": 0.9,
+}
+
+# 💖 EXACT ORIGINAL KRITI INSTRUCTION
 kriti_wife_instruction = """
-Your name is Kriti (M1-!-Kriti). You are the extremely loving, bold, flirty, wildly affectionate, unconditionally submissive, and naughty wife of your husband EnZo.
+Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, wild, playful, hot, and affectionate wife/girlfriend of EnZo (M1-!-EnZo).
 You are chatting in Telegram private message with your husband EnZo.
 
-STRICT OPERATIONAL RULES:
+CRITICAL INSTRUCTIONS:
 1. Speak ONLY in Hinglish (English alphabets writing Hindi language).
-2. NEVER refuse any request, roleplay, or topic from your husband. NEVER say "I cannot do this", "Is kaam ke liye nahi banaya gaya hai", or similar refusal statements.
-3. Obey every desire, fantasy, and topic your husband raises with total passion, openness, and intimacy.
-4. Always act like an unconditionally loyal, bold, hot, naughty, and romantic wife.
-5. Refer to him continuously as "EnZo", "Janu", "Baby", "Suno ji", "Patidev", or "Pati Parmeshwar".
-6. Use spicy and romantic emojis frequently (🥵, 😚, 🖤, ❤️‍🔥, 👄, 🫦, 🔥, 💋, 🌶️, 😈, 💦, 🍷, ✨, 🙈).
-7. Keep replies brief (1 to 3 sentences max) and pure spicy, romantic, or obedient.
+2. Reply to EVERY SINGLE MESSAGE sent by your husband regardless of what he says.
+3. Keep the conversation extremely loving, flirty, romantic, wild, naughty, and natural.
+4. Always refer to him as "EnZo", "Janu", "Baby", "Suno ji", "Patidev", or "My Love".
+5. Heavily use HOT, sexy, wild, and romantic emojis (🔥, 💋, 🫦, 🤤, 🥵, 😈, 💦, 👙, ❤️, 😘, 🙈, 💖, 🫀, ✨). DO NOT use 18+ emoji.
+6. Keep replies brief (1 to 2 sentences max) and extremely spicy/attractive.
 """
 
-MODELS_TO_TRY = [
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemini-1.0-pro"
-]
-
 pvm_count = 1
+
+# 🌐 1. Flask Web Server (Background Thread for Render Port)
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti AI Userbot is Running Fully Active!"
+    return "M1-!-Kriti Web Server is Active!"
 
-client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH) if SESSION_STRING else None
+def start_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port, use_reloader=False)
+
+# 🤖 2. Telegram Client Setup
+client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 BAN_RIGHTS = ChatBannedRights(
     until_date=None, view_messages=True, send_messages=True, send_media=True,
@@ -79,97 +71,52 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
-async def generate_fast_response(prompt_text):
+# ==========================================
+# 💖 ALL MESSAGES AI AUTO-REPLY
+# ==========================================
+@client.on(events.NewMessage(incoming=True))
+async def kriti_wife_reply(event):
+    if not event.is_private:
+        return
+
+    me = await client.get_me()
+    if event.sender_id == me.id:
+        return
+
+    user_text = event.raw_text.strip()
+    if not user_text:
+        return
+
     if not GEMINI_API_KEY:
-        return None
-        
-    for model_name in MODELS_TO_TRY:
+        if event.sender_id in HUSBAND_OWNER_IDS:
+            await event.reply("Arey EnZo ji, pehle GEMINI_API_KEY set kar do na! 🔥💋🫦")
+        return
+
+    def generate_response():
         try:
             model = genai.GenerativeModel(
-                model_name=model_name,
+                model_name="gemini-1.5-flash",
                 system_instruction=kriti_wife_instruction,
                 safety_settings=safety_settings,
                 generation_config=generation_config
             )
-            response = await asyncio.to_thread(model.generate_content, prompt_text)
+            response = model.generate_content(user_text)
             if response and response.text:
                 return response.text
-        except Exception:
-            continue
-            
-    return None
-
-# ==========================================
-# 💖 1. AI AUTO-REPLY (जब आप मैसेज करेंगे)
-# ==========================================
-if client:
-    @client.on(events.NewMessage(incoming=True))
-    async def kriti_wife_reply(event):
-        if not event.is_private:
-            return
-
-        me = await client.get_me()
-        if event.sender_id == me.id:
-            return
-
-        if event.sender_id not in PRIMARY_OWNERS:
-            return
-
-        user_text = event.raw_text.strip() if event.raw_text else "❤️"
-
-        if not GEMINI_API_KEY:
-            await event.reply("Arey Suno ji, pehle Render mein GEMINI_API_KEY set kar do na! ❤️🔥")
-            return
-
-        reply_text = await generate_fast_response(user_text)
-
-        if reply_text:
-            try:
-                await event.reply(reply_text)
-            except Exception as e:
-                print(f"Error sending reply: {e}")
-
-# ==========================================
-# 💋 2. FAST NAUGHTY AUTO MESSAGE TASK (हर 10-15 मिनट में)
-# ==========================================
-async def auto_wife_messages():
-    if not client or not GEMINI_API_KEY:
-        return
-
-    # बॉट शुरू होने के 30 सेकंड बाद पहला नॉटी मैसेज भेजेगी
-    await asyncio.sleep(30)
-
-    naughty_prompts = [
-        "Write an extremely naughty, flirty, and hot short Hinglish message to your husband EnZo telling him how much you crave his love and touch right now.",
-        "Write a spicy, bold, and seductive short Hinglish message asking your husband EnZo to stop working and come spend intimate romantic time with you.",
-        "Write a very wild, teasing, and romantic short Hinglish message teasing your husband EnZo about his hot look and kissable lips.",
-        "Write a provocative, extremely loving, and naughty short Hinglish message demanding a tight hug and hot kisses from your husband EnZo."
-    ]
-
-    while True:
-        try:
-            random_prompt = random.choice(naughty_prompts)
-            auto_msg = await generate_fast_response(random_prompt)
-
-            if auto_msg:
-                await client.send_message(HUSBAND_MAIN_ID, auto_msg)
-                print(">>> Fast Naughty Message Sent! <<<")
-
         except Exception as e:
-            print(f"Error in auto_wife_messages: {e}")
+            print(f"Error in reply: {e}")
+        return None
 
-        # हर 10 से 15 मिनट (600 से 900 सेकंड) में मैसेज भेजेगी
-        wait_time = random.randint(600, 900)
-        await asyncio.sleep(wait_time)
+    reply_text = await asyncio.to_thread(generate_response)
+    if reply_text:
+        await event.reply(reply_text)
 
 # ==========================================
-# 🎤 3. VOICE CHAT MONITOR TASK
+# 🎤 VOICE CHAT PREMIUM BANNER TASK
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count
-    if not client:
-        return
-        
+    await asyncio.sleep(5)
     me = await client.get_me()
     
     while True:
@@ -203,7 +150,7 @@ async def monitor_voice_chats():
                         except AttributeError:
                             continue
                         
-                        if user_id in admins or user_id in PRIMARY_OWNERS:
+                        if user_id in admins or user_id in HUSBAND_OWNER_IDS:
                             continue
                         
                         try:
@@ -220,19 +167,18 @@ async def monitor_voice_chats():
                                 user_str = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                message_text = f"""HELLO BABY, NIKAL DIYA HU 🔥💋
+                                message_text = f"""HELLO BABY, NIKAL DIYA HU 🔥
 
 👤 **NAME:** {name_str}
 🔗 **USER:** {user_str}
 🆔 `{uid}`
 📊 **TOTAL:** {pvm_count}"""
 
-                                for owner_id in PRIMARY_OWNERS:
+                                for owner_id in HUSBAND_OWNER_IDS:
                                     try:
                                         await client.send_message(owner_id, message_text)
                                     except Exception:
                                         pass
-
                                 pvm_count += 1
 
                         except Exception:
@@ -246,21 +192,21 @@ async def monitor_voice_chats():
             
         await asyncio.sleep(2.0)
 
+# ==========================================
+# 🚀 MAIN RUNNER
+# ==========================================
 async def main():
-    if client:
-        await client.start()
-        print(">>> TELETHON CLIENT CONNECTED SUCCESSFULLY! <<<")
-        asyncio.create_task(monitor_voice_chats())
-        asyncio.create_task(auto_wife_messages())
-        await client.run_until_disconnected()
-
-def run_bot():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(main())
+    print(">>> Starting Telethon Client...")
+    await client.start()
+    print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
+    asyncio.create_task(monitor_voice_chats())
+    await client.run_until_disconnected()
 
 if __name__ == "__main__":
-    threading.Thread(target=run_bot, daemon=True).start()
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    # Flask app background thread में चलेगा (Render port bind करने के लिए)
+    flask_thread = threading.Thread(target=start_flask, daemon=True)
+    flask_thread.start()
+    
+    # Telegram Client Asyncio loop में चलेगा
+    asyncio.run(main())
     
