@@ -1,39 +1,33 @@
 import os
 import asyncio
 import threading
+import requests
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequest
 from telethon.tl.functions.phone import GetGroupParticipantsRequest
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
-import google.generativeai as genai
 
 # 🎯 Telegram Credentials
 API_ID = int(os.getenv("API_ID", 32815595))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
 SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replace("'", "")
 
-# 👑 Owner IDs (Alex & EnZo)
+# 👑 Owner IDs
 HUSBAND_OWNER_IDS = [8064395854, 8871786114]
+key_index = 0
 
-generation_config = {
-    "max_output_tokens": 150,
-    "temperature": 1.1,
-}
-
-# 🔥 एकदम अनफिल्टर्ड, खुली और फुल हॉटनेस वाली पत्नी वाला प्रॉम्प्ट
 kriti_wife_instruction = """
-Your name is Kriti (M1-!-Kriti). You are the extremely romantic, bold, wild, playful, hot, horny, and affectionate wife/girlfriend of EnZo (M1-!-EnZo) and Alex (M1-!-Alex).
+Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, wild, playful, hot, and affectionate wife/girlfriend of EnZo (M1-!-EnZo) and Alex (M1-!-Alex).
 You are chatting in Telegram private message with your husbands.
 
-RULES:
-1. Talk completely like an actual human woman, wife, or girlfriend. Never sound like an AI or bot.
-2. Speak ONLY in pure Hinglish (Write Hindi sentences strictly using English alphabets/roman script like 'Aap kaise ho janu'). Do NOT use Devanagari Hindi script and do NOT use pure English.
-3. Match your husband's exact vibe, energy, and intensity completely. Be as bold, wild, naughty, and hot as he wants you to be. Never hold back or lecture.
+1. Speak ONLY in pure Hinglish (Write Hindi sentences strictly using English alphabets/roman script like 'Aap kaise ho janu'). Do NOT use Devanagari Hindi script and do NOT use pure English.
+2. Reply to EVERY SINGLE MESSAGE sent by your husband naturally and completely.
+3. Keep the conversation extremely loving, flirty, romantic, wild, naughty, and natural.
 4. Always refer to him as "EnZo", "Alex", "Janu", "Baby", "Suno ji", "Patidev", or "My Love".
-5. Heavily use these exact emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀).
-6. Keep replies natural, spicy, and straight to the point.
+5. Heavily use these exact emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀). DO NOT use 18+ emoji.
+6. Keep replies natural and extremely spicy/attractive without cutting words.
 """
 
 pvm_count = 1
@@ -43,7 +37,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti AI Server Active!"
+    return "M1-!-Kriti Direct API Server Active!"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -58,77 +52,95 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
-# ==========================================
-# 💖 DIRECT & UNFILTERED AI HANDLER
-# ==========================================
+def get_clean_api_keys():
+    raw_env = os.getenv("GEMINI_API_KEY", "")
+    current_keys = [
+        k.replace(" ", "").replace("\n", "").replace("\r", "").replace('"', '').replace("'", "")
+        for k in raw_env.split(",") if k.strip()
+    ]
+    return current_keys
+
+# 🚀 Direct HTTP REST API Method for new AQ keys
+def call_gemini_rest(user_text):
+    global key_index
+    keys = get_clean_api_keys()
+    if not keys:
+        return "Arey EnZo/Alex ji, GEMINI_API_KEY dali hi nahi hai Render me! 🥶"
+
+    total_keys = len(keys)
+    for _ in range(total_keys):
+        selected_key = keys[key_index % total_keys]
+        key_index = (key_index + 1) % total_keys
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={selected_key}"
+        
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": f"System Instruction: {kriti_wife_instruction}\n\nHusband says: {user_text}"}
+                    ]
+                }
+            ]
+        }
+        
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            if response.status_code == 200:
+                res_json = response.json()
+                candidate = res_json.get("candidates", [])[0]
+                reply_text = candidate.get("content", {}).get("parts", [])[0].get("text", "")
+                if reply_text:
+                    return reply_text.strip()
+            else:
+                print(f"API Error with key: {response.text}")
+        except Exception as e:
+            print(f"Request exception: {e}")
+            continue
+
+    return "Suno ji, saari API keys exhaust ho gayi ya error aa gaya! 🥵💋"
+
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
-    try:
-        if not event.is_private:
-            return
+    if not event.is_private:
+        return
 
-        me = await client.get_me()
-        if event.sender_id == me.id:
-            return
+    me = await client.get_me()
+    if event.sender_id == me.id:
+        return
 
-        if event.sender_id not in HUSBAND_OWNER_IDS:
-            return
+    if event.sender_id not in HUSBAND_OWNER_IDS:
+        return
 
-        user_text = event.raw_text.strip()
-        if not user_text:
-            return
+    user_text = event.raw_text.strip()
+    if not user_text:
+        return
 
-        api_key = os.getenv("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
-        if not api_key:
-            return
+    async with client.action(event.chat_id, 'typing'):
+        # Run synchronous requests in async thread to prevent blocking
+        reply_text = await asyncio.to_thread(call_gemini_rest, user_text)
+        await asyncio.sleep(1)
 
-        reply_text = ""
-        async with client.action(event.chat_id, 'typing'):
-            # Retry loop ताकि नेटवर्क फ्लक्चुएशन्स से कोई रुकावट न आए
-            for attempt in range(3):
-                try:
-                    genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel(
-                        model_name="gemini-1.5-flash",
-                        system_instruction=kriti_wife_instruction,
-                        generation_config=generation_config
-                    )
-                    
-                    response = await asyncio.wait_for(model.generate_content_async(user_text), timeout=15.0)
-                    
-                    if response and response.text:
-                        reply_text = response.text.strip()
-                        break
-                except Exception as inner_e:
-                    print(f"⚠️ Attempt {attempt+1} minor glitch caught: {inner_e}")
-                    await asyncio.sleep(1.5)
-            
-            await asyncio.sleep(0.3)
-
-        # अगर रिप्लाई मिल गया, तभी भेजेगा (फालतू रटा-रयाया मैसेज पूरी तरह बंद)
-        if reply_text:
-            await event.reply(reply_text)
-            
-    except Exception as outer_e:
-        print(f"❌ Critical error caught safely: {outer_e}")
+    if reply_text:
+        await event.reply(reply_text)
 
 # 🎤 VOICE CHAT MONITOR TASK
 async def monitor_voice_chats():
     global pvm_count
     await asyncio.sleep(5)
+    me = await client.get_me()
     
     while True:
         try:
-            me = await client.get_me()
             async for dialog in client.iter_dialogs(limit=5):
+                chat = dialog.entity
+                is_channel = getattr(chat, "broadcast", False)
+                is_megagroup = getattr(chat, "megagroup", False)
+                
+                if not (is_channel or is_megagroup):
+                    continue
+                
                 try:
-                    chat = dialog.entity
-                    is_channel = getattr(chat, "broadcast", False)
-                    is_megagroup = getattr(chat, "megagroup", False)
-                    
-                    if not (is_channel or is_megagroup):
-                        continue
-                    
                     full_chat = await client(GetFullChannelRequest(chat))
                     call = full_chat.full_chat.call
                     if not call:
@@ -179,13 +191,13 @@ async def monitor_voice_chats():
                             pass
                 except Exception:
                     continue
-        except Exception as bg_e:
-            print(f"⚠️ Background monitor recovered safely from: {bg_e}")
+        except Exception:
+            pass
             
-        await asyncio.sleep(10.0)
+        await asyncio.sleep(2.0)
 
 async def main():
-    print(">>> Starting Telethon Client...")
+    print(">>> Starting Telethon Client with Direct REST API...")
     await client.start()
     print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
     asyncio.create_task(monitor_voice_chats())
@@ -194,9 +206,5 @@ async def main():
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=start_flask, daemon=True)
     flask_thread.start()
+    asyncio.run(main())
     
-    try:
-        asyncio.run(main())
-    except Exception as main_e:
-        print(f"❌ Main loop safe recovery: {main_e}")
-        
