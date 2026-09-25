@@ -84,9 +84,10 @@ async def kriti_wife_reply(event):
         async with client.action(event.chat_id, 'typing'):
             try:
                 genai.configure(api_key=api_key)
-                # यहाँ एकदम सही और स्टेबल मॉडल नाम का इस्तेमाल किया है
+                
+                # यहाँ बिना मॉडल नाम दिए सीधे डिफ़ॉल्ट जेनेरिक मॉडल उठाएगा जो एपीआई वर्ज़न से मैच करेगा
                 model = genai.GenerativeModel(
-                    model_name="gemini-1.5-flash",
+                    model_name='gemini-pro',
                     system_instruction=kriti_wife_instruction,
                     generation_config=generation_config
                 )
