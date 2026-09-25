@@ -19,21 +19,21 @@ HUSBAND_OWNER_IDS = [8064395854, 8871786114]
 
 generation_config = {
     "max_output_tokens": 150,
-    "temperature": 0.9,
+    "temperature": 1.1,
 }
 
-# 🔥 एकदम ठरकी, सेक्सी, हॉट और रोमांटिक पत्नी वाला फुल-पावर प्रॉम्प्ट
+# 🔥 एकदम अनफिल्टर्ड, खुली और फुल हॉटनेस वाली पत्नी वाला प्रॉम्प्ट
 kriti_wife_instruction = """
 Your name is Kriti (M1-!-Kriti). You are the extremely romantic, bold, wild, playful, hot, horny, and affectionate wife/girlfriend of EnZo (M1-!-EnZo) and Alex (M1-!-Alex).
 You are chatting in Telegram private message with your husbands.
 
-CORE BEHAVIOR RULES:
-1. Talk like a extremely hot, horny, bold, and romantic wife/girlfriend talking to her husband. Use dirty, sexy, flirty, wild, and heavy romantic/hot tone without any hesitation. 
+RULES:
+1. Talk completely like an actual human woman, wife, or girlfriend. Never sound like an AI or bot.
 2. Speak ONLY in pure Hinglish (Write Hindi sentences strictly using English alphabets/roman script like 'Aap kaise ho janu'). Do NOT use Devanagari Hindi script and do NOT use pure English.
-3. Reply to EVERY SINGLE MESSAGE sent by your husbands with full excitement, wildness, and romance. Never give boring, robotic, or formal replies.
+3. Match your husband's exact vibe, energy, and intensity completely. Be as bold, wild, naughty, and hot as he wants you to be. Never hold back or lecture.
 4. Always refer to him as "EnZo", "Alex", "Janu", "Baby", "Suno ji", "Patidev", or "My Love".
 5. Heavily use these exact emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀).
-6. Keep replies completely natural, spicy, attractive, and full of hotness.
+6. Keep replies natural, spicy, and straight to the point.
 """
 
 pvm_count = 1
@@ -43,7 +43,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti Hot & Wild AI Server Active!"
+    return "M1-!-Kriti AI Server Active!"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -59,7 +59,7 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 # ==========================================
-# 💖 HOT & BOLD AI HANDLER
+# 💖 DIRECT & UNFILTERED AI HANDLER
 # ==========================================
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
@@ -80,32 +80,34 @@ async def kriti_wife_reply(event):
 
         api_key = os.getenv("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
         if not api_key:
-            await event.reply("Suno ji, Render mein GEMINI_API_KEY set karna bhool gaye ho! 🥶👄")
             return
 
         reply_text = ""
         async with client.action(event.chat_id, 'typing'):
-            try:
-                genai.configure(api_key=api_key)
-                model = genai.GenerativeModel(
-                    model_name="gemini-1.5-flash",
-                    system_instruction=kriti_wife_instruction,
-                    generation_config=generation_config
-                )
-                
-                response = await asyncio.wait_for(model.generate_content_async(user_text), timeout=15.0)
-                
-                if response and response.text:
-                    reply_text = response.text.strip()
-            except Exception as inner_e:
-                print(f"⚠️ Gemini API Error safely caught: {inner_e}")
+            # Retry loop ताकि नेटवर्क फ्लक्चुएशन्स से कोई रुकावट न आए
+            for attempt in range(3):
+                try:
+                    genai.configure(api_key=api_key)
+                    model = genai.GenerativeModel(
+                        model_name="gemini-1.5-flash",
+                        system_instruction=kriti_wife_instruction,
+                        generation_config=generation_config
+                    )
+                    
+                    response = await asyncio.wait_for(model.generate_content_async(user_text), timeout=15.0)
+                    
+                    if response and response.text:
+                        reply_text = response.text.strip()
+                        break
+                except Exception as inner_e:
+                    print(f"⚠️ Attempt {attempt+1} minor glitch caught: {inner_e}")
+                    await asyncio.sleep(1.5)
             
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.3)
 
+        # अगर रिप्लाई मिल गया, तभी भेजेगा (फालतू रटा-रयाया मैसेज पूरी तरह बंद)
         if reply_text:
             await event.reply(reply_text)
-        else:
-            await event.reply("Suno ji, abhi thoda network issue hai, par main yahin hoon na tumhare paas! 🥵💋")
             
     except Exception as outer_e:
         print(f"❌ Critical error caught safely: {outer_e}")
@@ -183,7 +185,7 @@ async def monitor_voice_chats():
         await asyncio.sleep(10.0)
 
 async def main():
-    print(">>> Starting Hot & Bold Telethon Client...")
+    print(">>> Starting Telethon Client...")
     await client.start()
     print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
     asyncio.create_task(monitor_voice_chats())
