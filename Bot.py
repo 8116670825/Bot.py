@@ -84,8 +84,9 @@ async def kriti_wife_reply(event):
             try:
                 genai.configure(api_key=api_key)
                 
+                # यहाँ gemini-pro मॉडल सेट कर दिया गया है जो आपकी की के साथ पूरी तरह कम्पैटिबल है
                 model = genai.GenerativeModel(
-                    model_name='gemini-1.5-flash',
+                    model_name='gemini-pro',
                     system_instruction=kriti_wife_instruction,
                     generation_config=generation_config
                 )
@@ -191,4 +192,3 @@ if __name__ == "__main__":
     flask_thread = threading.Thread(target=start_flask, daemon=True)
     flask_thread.start()
     asyncio.run(main())
-    
