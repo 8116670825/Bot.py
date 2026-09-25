@@ -45,13 +45,10 @@ You are chatting in Telegram private message with your husbands.
 6. Keep replies natural and extremely spicy/attractive without cutting words.
 """
 
+# ✅ केवल वर्किंग और लेटेस्ट मॉडल्स रखे गए हैं ताकि 404 एरर न आए
 MODELS_TO_TRY = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
     "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
-    "gemini-1.5-pro",
-    "gemini-1.0-pro"
+    "gemini-1.5-pro"
 ]
 
 pvm_count = 1
