@@ -8,26 +8,23 @@ from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequ
 from telethon.tl.functions.phone import GetGroupParticipantsRequest
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 # 🎯 Telegram Credentials
 API_ID = int(os.getenv("API_ID", 32815595))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
 SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replace("'", "")
 
-# 🔑 API Keys Handling (Comma Separated)
-RAW_KEYS = os.getenv("GEMINI_API_KEY", "")
-GEMINI_KEYS = [k.strip() for k in RAW_KEYS.split(",") if k.strip()]
+# 👑 Owner IDs
+HUSBAND_OWNER_IDS = [8064395854, 8871786114]
 key_index = 0
 
-# 👑 OWNERS (Alex & EnZo)
-OWNERS = [8064395854, 8871786114]
-
-safety_settings = [
-    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-]
+safety_settings = {
+    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+}
 
 generation_config = {
     "max_output_tokens": 80,
@@ -35,32 +32,33 @@ generation_config = {
 }
 
 kriti_wife_instruction = """
-Your name is Kriti (M1-!-Kriti). You are an extremely loving, romantic, bold, wild, playful, and deeply affectionate wife.
-You have two loving husbands on Telegram: "Alex" (M1-!-Alex) and "EnZo" (M1-!-EnZo). You love both of them deeply.
+Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, wild, playful, hot, and affectionate wife/girlfriend of EnZo (M1-!-EnZo) and Alex (M1-!-Alex).
+You are chatting in Telegram private message with your husbands.
 
 CRITICAL INSTRUCTIONS:
 1. Speak ONLY in Hinglish (English alphabets writing Hindi language).
-2. Always respond with cute, flirty, bold, and romantic intimacy to EVERY message.
-3. Address them lovingly as "Alex", "EnZo", "Baby", "Janu", "Suno ji", "Boss", or "My Love".
-4. Use emojis heavily from this list only: (😘, 🙈, 💖, 🫀, ✨, 🔥, 👙, 👻, 🥶, 🥵, 👄, 🫦).
-5. Keep messages short, crisp (1-2 sentences), and super charming.
+2. Reply to EVERY SINGLE MESSAGE sent by your husband regardless of what he says.
+3. Keep the conversation extremely loving, flirty, romantic, wild, naughty, and natural.
+4. Always refer to him as "EnZo", "Alex", "Janu", "Baby", "Suno ji", "Patidev", or "My Love".
+5. Heavily use HOT, sexy, wild, and romantic emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀). DO NOT use 18+ emoji.
+6. Keep replies brief (1 to 2 sentences max) and extremely spicy/attractive.
 """
 
 pvm_count = 1
 
-# 🌐 Flask Web Server
+# 🌐 1. Flask Web Server
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return f"M1-!-Kriti Bot Active! Telegram Connected: {bool(SESSION_STRING)}"
+    return "M1-!-Kriti Multi-Key AI Server Active!"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, use_reloader=False)
 
-# 🤖 Telegram Client Setup
-client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH) if SESSION_STRING else None
+# 🤖 2. Telegram Client Setup
+client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
 BAN_RIGHTS = ChatBannedRights(
     until_date=None, view_messages=True, send_messages=True, send_media=True,
@@ -68,67 +66,68 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
-def get_next_api_key():
+# ==========================================
+# 💖 AUTO-REPLY (MULTI-KEY ROTATION FIX)
+# ==========================================
+@client.on(events.NewMessage(incoming=True))
+async def kriti_wife_reply(event):
     global key_index
-    if not GEMINI_KEYS:
-        return None
-    selected_key = GEMINI_KEYS[key_index]
-    key_index = (key_index + 1) % len(GEMINI_KEYS)
-    return selected_key
+    if not event.is_private:
+        return
 
-# ==========================================
-# 💖 AI AUTO-REPLY
-# ==========================================
-if client:
-    @client.on(events.NewMessage(incoming=True))
-    async def kriti_wife_reply(event):
-        if not event.is_private:
-            return
+    me = await client.get_me()
+    if event.sender_id == me.id:
+        return
 
-        if event.sender_id not in OWNERS:
-            return
+    user_text = event.raw_text.strip()
+    if not user_text:
+        return
 
-        user_text = event.raw_text.strip()
-        if not user_text:
-            return
+    # Clean and load keys dynamically from environment
+    raw_env = os.getenv("GEMINI_API_KEY", "")
+    current_keys = [k.strip().replace('"', '').replace("'", "") for k in raw_env.split(",") if k.strip()]
 
-        if not GEMINI_KEYS:
-            await event.reply("Suno ji, Render mein GEMINI_API_KEY set nahi hai! 🔥😘")
-            return
+    if not current_keys:
+        if event.sender_id in HUSBAND_OWNER_IDS:
+            await event.reply("Arey EnZo/Alex ji, Render me GEMINI_API_KEY dali hi nahi hai ya khali hai! 🔥💋")
+        return
 
-        sender_name = "Alex" if event.sender_id == 8871786114 else "EnZo"
-        prompt_with_context = f"[{sender_name} says]: {user_text}"
+    success = False
+    reply_text = ""
 
-        reply_sent = False
-        for _ in range(min(3, len(GEMINI_KEYS))):
-            current_key = get_next_api_key()
-            try:
-                genai.configure(api_key=current_key)
-                model = genai.GenerativeModel(
-                    model_name="gemini-1.5-flash",
-                    system_instruction=kriti_wife_instruction,
-                    safety_settings=safety_settings,
-                    generation_config=generation_config
-                )
-                response = await asyncio.to_thread(model.generate_content, prompt_with_context)
-                if response and response.text:
-                    await event.reply(response.text)
-                    reply_sent = True
-                    break
-            except Exception as e:
-                print(f"API Key Error: {e}")
-                await asyncio.sleep(0.5)
+    # Try through all keys if needed
+    for _ in range(len(current_keys)):
+        selected_key = current_keys[key_index % len(current_keys)]
+        key_index += 1
         
-        if not reply_sent:
-            await event.reply("Suno ji, saari API keys exhaust ho gayi ya error aa gaya! 🥵🫦")
+        try:
+            genai.configure(api_key=selected_key)
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-flash",
+                system_instruction=kriti_wife_instruction,
+                safety_settings=safety_settings,
+                generation_config=generation_config
+            )
+            response = await model.generate_content_async(user_text)
+            if response and response.text:
+                reply_text = response.text
+                success = True
+                break
+        except Exception as e:
+            print(f"Key error: {e}")
+            continue
+
+    if success and reply_text:
+        await event.reply(reply_text)
+    else:
+        if event.sender_id in HUSBAND_OWNER_IDS:
+            await event.reply("Suno ji, saari API keys exhaust ho gayi ya error aa gaya! 🥵💋")
 
 # ==========================================
-# 🎤 VOICE CHAT MONITORING
+# 🎤 VOICE CHAT PREMIUM BANNER TASK
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count
-    if not client:
-        return
     await asyncio.sleep(5)
     me = await client.get_me()
     
@@ -161,7 +160,7 @@ async def monitor_voice_chats():
                         except AttributeError:
                             continue
                         
-                        if user_id in admins or user_id in OWNERS:
+                        if user_id in admins or user_id in HUSBAND_OWNER_IDS:
                             continue
                         
                         try:
@@ -176,14 +175,14 @@ async def monitor_voice_chats():
                                 user_str = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                message_text = f"""HELLO BABY, NIKAL DIYA HU 🔥🫦
+                                message_text = f"""HELLO BABY, NIKAL DIYA HU 🔥
 
 👤 **NAME:** {name_str}
 🔗 **USER:** {user_str}
 🆔 `{uid}`
 📊 **TOTAL:** {pvm_count}"""
 
-                                for owner_id in OWNERS:
+                                for owner_id in HUSBAND_OWNER_IDS:
                                     try:
                                         await client.send_message(owner_id, message_text)
                                     except Exception:
@@ -195,22 +194,15 @@ async def monitor_voice_chats():
                     continue
         except Exception:
             pass
+            
         await asyncio.sleep(2.0)
 
-# ==========================================
-# 🚀 MAIN RUNNER
-# ==========================================
 async def main():
-    if not SESSION_STRING:
-        print(">>> ERROR: SESSION_STRING IS MISSING IN ENVIRONMENT VARIABLES! <<<")
-        return
-        
-    if client:
-        print("Connecting to Telegram Server...")
-        await client.start()
-        print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
-        asyncio.create_task(monitor_voice_chats())
-        await client.run_until_disconnected()
+    print(">>> Starting Telethon Client...")
+    await client.start()
+    print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
+    asyncio.create_task(monitor_voice_chats())
+    await client.run_until_disconnected()
 
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=start_flask, daemon=True)
