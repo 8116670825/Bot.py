@@ -4,9 +4,6 @@ import threading
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequest
-from telethon.tl.functions.phone import GetGroupParticipantsRequest
-from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
@@ -53,87 +50,82 @@ Rules for tone & style:
 3. Keep your replies short (1-2 sentences), natural, flirty, and full of affection.
 """
 
-# 🌐 1. Flask Web Server
+# 🌐 1. Flask Web Server Setup
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti Bot Server is Active!"
+    return "M1-!-Kriti Bot Server is Active 24/7!"
 
-def start_flask():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, use_reloader=False)
-
-# 🤖 2. Telegram Client Setup
-client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-
-async def is_authorized_sender(event):
-    if event.sender_id in OWNERS:
-        return True
-    sender = await event.get_sender()
-    if not sender:
-        return False
-    if getattr(sender, 'username', None) and sender.username.lower() in [u.lower() for u in AUTHORIZED_USERNAMES]:
-        return True
-    if getattr(sender, 'phone', None) and any(p in str(sender.phone) for p in ALLOWED_PHONES):
-        return True
-    return False
-
-# 💋 3. AI CHAT AUTO REPLIER
-@client.on(events.NewMessage(incoming=True))
-async def kriti_wife_reply(event):
-    if not event.is_private:
-        return
-
-    me = await client.get_me()
-    if event.sender_id == me.id or event.raw_text.startswith("."):
-        return
-
-    if not await is_authorized_sender(event):
-        return
-
-    user_text = event.raw_text.strip()
-    if not user_text:
-        return
-
-    if not GEMINI_API_KEY:
-        await event.reply("Arey suno na jaan, GEMINI_API_KEY set kar do pehle! ❤️")
-        return
-
-    try:
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=kriti_wife_instruction,
-            safety_settings=safety_settings,
-            generation_config=generation_config
-        )
-        response = await asyncio.to_thread(model.generate_content, user_text)
-        if response and response.text:
-            await event.reply(response.text)
-    except Exception as e:
-        print(f"Gemini AI Error: {e}")
-
-# 🚀 4. Main Connection Loop
-async def main():
-    print("Connecting Telegram Client...")
+# 🤖 2. Telegram Bot Loop
+async def run_bot():
+    print(">>> INITIALIZING TELEGRAM CLIENT... <<<")
     if not SESSION_STRING:
-        print("❌ ERROR: SESSION_STRING environment variable is missing or empty!")
+        print("❌ ERROR: SESSION_STRING environment variable is missing!")
         return
-    try:
-        await client.connect()
-        if not await client.is_user_authorized():
-            print("❌ ERROR: Invalid SESSION_STRING! Please generate a new one.")
+
+    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+
+    async def is_authorized_sender(event):
+        if event.sender_id in OWNERS:
+            return True
+        sender = await event.get_sender()
+        if not sender:
+            return False
+        if getattr(sender, 'username', None) and sender.username.lower() in [u.lower() for u in AUTHORIZED_USERNAMES]:
+            return True
+        if getattr(sender, 'phone', None) and any(p in str(sender.phone) for p in ALLOWED_PHONES):
+            return True
+        return False
+
+    @client.on(events.NewMessage(incoming=True))
+    async def kriti_wife_reply(event):
+        if not event.is_private:
             return
-        
+
         me = await client.get_me()
-        print(f">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY AS: {me.first_name} (@{me.username}) <<<")
+        if event.sender_id == me.id or event.raw_text.startswith("."):
+            return
+
+        if not await is_authorized_sender(event):
+            return
+
+        user_text = event.raw_text.strip()
+        if not user_text:
+            return
+
+        if not GEMINI_API_KEY:
+            await event.reply("Arey suno na jaan, GEMINI_API_KEY set kar do pehle! ❤️")
+            return
+
+        try:
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-flash",
+                system_instruction=kriti_wife_instruction,
+                safety_settings=safety_settings,
+                generation_config=generation_config
+            )
+            response = await asyncio.to_thread(model.generate_content, user_text)
+            if response and response.text:
+                await event.reply(response.text)
+        except Exception as e:
+            print(f"Gemini AI Error: {e}")
+
+    try:
+        await client.start()
+        me = await client.get_me()
+        print(f"==================================================")
+        print(f" SUCCESS: CONNECTED AS {me.first_name} (@{me.username})")
+        print(f"==================================================")
         await client.run_until_disconnected()
     except Exception as e:
-        print(f"❌ TELEGRAM CONNECTION ERROR: {e}")
+        print(f"❌ TELEGRAM LOGIN ERROR: {e}")
 
-if __name__ == "__main__":
-    flask_thread = threading.Thread(target=start_flask, daemon=True)
-    flask_thread.start()
-    
-    asyncio.run(main())
-    
+def start_bot_thread():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(run_bot())
+
+# Start Bot Thread automatically when Gunicorn loads this file
+bot_thread = threading.Thread(target=start_bot_thread, daemon=True)
+bot_thread.start()
