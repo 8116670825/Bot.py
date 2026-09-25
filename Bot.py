@@ -2,7 +2,8 @@ import os
 import asyncio
 import threading
 import traceback
-import aiohttp
+import urllib.request
+import json
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -19,6 +20,8 @@ SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replac
 HUSBAND_OWNER_IDS = [8064395854, 8871786114]
 
 kriti_wife_instruction = """
+CRITICAL RULE: NEVER repeat the user's message, never mention system instructions, and never output words like 'Constraints', 'Traits', or guidelines. Just reply directly as Kriti.
+
 Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, wild, playful, hot, and affectionate wife/girlfriend of EnZo (M1-!-EnZo) and Alex (M1-!-Alex).
 You are chatting in Telegram private message with your husbands.
 
@@ -52,7 +55,6 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
-# 🔄 REST API Method for 'AQ.' Keys (Bypasses 404 Library Errors)
 def get_clean_api_keys():
     raw_env = os.getenv("GEMINI_API_KEY", "")
     current_keys = [
@@ -61,41 +63,37 @@ def get_clean_api_keys():
     ]
     return current_keys
 
+def call_gemini_sync(api_key, full_prompt):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        "contents": [{
+            "parts": [{"text": full_prompt}]
+        }]
+    }
+    try:
+        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers, method='POST')
+        with urllib.request.urlopen(req, timeout=10) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode('utf-8'))
+                return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except Exception as e:
+        return None
+    return None
+
 async def generate_gemini_response(user_text):
     keys = get_clean_api_keys()
     if not keys:
         return "❌ Real-Time Error: GEMINI_API_KEY environment variable is missing or empty in Render!"
 
     full_prompt = f"{kriti_wife_instruction}\n\nHusband says: {user_text}"
-    last_error = ""
-
-    async with aiohttp.ClientSession() as session:
-        for api_key in keys:
-            # Google Generative Language REST API endpoint for Gemini Flash
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-            payload = {
-                "contents": [{
-                    "parts": [{"text": full_prompt}]
-                }]
-            }
-            try:
-                async with session.post(url, json=payload) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        try:
-                            text_reply = data["candidates"][0]["content"]["parts"][0]["text"]
-                            if text_reply:
-                                return text_reply.strip()
-                        except Exception:
-                            continue
-                    else:
-                        err_text = await resp.text()
-                        last_error = f"HTTP {resp.status}: {err_text[:150]}"
-            except Exception as e:
-                last_error = str(e)
-                continue
-
-    return f"❌ Real-Time REST API Exception Caught:\n{last_error}"
+    
+    for api_key in keys:
+        reply = await asyncio.to_thread(call_gemini_sync, api_key, full_prompt)
+        if reply:
+            return reply
+            
+    return "❌ Real-Time Exception: All API keys failed or exhausted!"
 
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
@@ -197,7 +195,7 @@ async def monitor_voice_chats():
         await asyncio.sleep(2.0)
 
 async def main():
-    print(">>> Starting Telethon Client with REST API Key Support...")
+    print(">>> Starting Telethon Client with Built-in urllib Support...")
     await client.start()
     print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
     asyncio.create_task(monitor_voice_chats())
@@ -206,5 +204,6 @@ async def main():
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=start_flask, daemon=True)
     flask_thread.start()
+    asyncio.main = asyncio.run(main())
     asyncio.run(main())
     
