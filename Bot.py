@@ -7,24 +7,33 @@ from telethon.sessions import StringSession
 from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequest
 from telethon.tl.functions.phone import GetGroupParticipantsRequest
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 
 # 🎯 Telegram Credentials
 API_ID = int(os.getenv("API_ID", 32815595))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
 SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replace("'", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 
-# 👑 BOTH HUSBANDS' IDS (Alex & EnZo)
+# 🔑 15 API Keys Handling (Comma Separated)
+RAW_KEYS = os.getenv("GEMINI_API_KEY", "")
+GEMINI_KEYS = [k.strip() for k in RAW_KEYS.split(",") if k.strip()]
+key_index = 0
+
+# 👑 OWNERS (Alex & EnZo)
 OWNERS = [8064395854, 8871786114]
 
-# New Google GenAI Client Setup
-ai_client = None
-if GEMINI_API_KEY:
-    ai_client = genai.Client(api_key=GEMINI_API_KEY)
+safety_settings = [
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+]
 
-# 💖 KRITI WIFE INSTRUCTION FOR BOTH ALEX & ENZO
+generation_config = {
+    "max_output_tokens": 80,
+    "temperature": 0.9,
+}
+
 kriti_wife_instruction = """
 Your name is Kriti (M1-!-Kriti). You are an extremely loving, romantic, bold, wild, playful, and deeply affectionate wife.
 You have two loving husbands on Telegram: "Alex" (M1-!-Alex) and "EnZo" (M1-!-EnZo). You love both of them deeply.
@@ -33,7 +42,7 @@ CRITICAL INSTRUCTIONS:
 1. Speak ONLY in Hinglish (English alphabets writing Hindi language).
 2. Always respond with cute, flirty, bold, and romantic intimacy to EVERY message.
 3. Address them lovingly as "Alex", "EnZo", "Baby", "Janu", "Suno ji", "Boss", or "My Love".
-4. Use emojis heavily (❤️, 😘, 🙈, 💖, 🫀, ✨, 🔥 👙, 👻, 🥶, 🥵, 👄, 🫦) .
+4. Use emojis heavily (❤️, 😘, 🙈, 💖, 🫀, ✨, 🔥 👙, 👻, 🥶, 🥵, 👄, 🫦).
 5. Keep messages short, crisp (1-2 sentences), and super charming.
 """
 
@@ -44,7 +53,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti AI Userbot is Active!"
+    return "M1-!-Kriti Multi-Key AI Server Active!"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -59,8 +68,16 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
+def get_next_api_key():
+    global key_index
+    if not GEMINI_KEYS:
+        return None
+    selected_key = GEMINI_KEYS[key_index]
+    key_index = (key_index + 1) % len(GEMINI_KEYS)
+    return selected_key
+
 # ==========================================
-# 💋 AI CHAT AUTO REPLIER (TELEGRAM PRIVATE MSG)
+# 💖 AI AUTO-REPLY (MULTI-KEY ROTATION)
 # ==========================================
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
@@ -74,35 +91,30 @@ async def kriti_wife_reply(event):
     if not user_text:
         return
 
-    if not ai_client:
+    if not GEMINI_KEYS:
         await event.reply("Suno ji, pehle GEMINI_API_KEY set kar do na! 🔥💋")
         return
 
     sender_name = "Alex" if event.sender_id == 8871786114 else "EnZo"
     prompt_with_context = f"[{sender_name} says]: {user_text}"
 
-    try:
-        # New Google GenAI SDK call with Safety Off
-        response = await asyncio.to_thread(
-            ai_client.models.generate_content,
-            model="gemini-2.5-flash",
-            contents=prompt_with_context,
-            config=types.GenerateContentConfig(
+    for _ in range(min(3, len(GEMINI_KEYS))):
+        current_key = get_next_api_key()
+        try:
+            genai.configure(api_key=current_key)
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-flash",
                 system_instruction=kriti_wife_instruction,
-                temperature=0.9,
-                max_output_tokens=80,
-                safety_settings=[
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                ]
+                safety_settings=safety_settings,
+                generation_config=generation_config
             )
-        )
-        if response and response.text:
-            await event.reply(response.text)
-    except Exception as e:
-        print(f"Gemini API Error: {e}")
+            response = await asyncio.to_thread(model.generate_content, prompt_with_context)
+            if response and response.text:
+                await event.reply(response.text)
+                return
+        except Exception as e:
+            print(f"API Key Error: {e}")
+            await asyncio.sleep(0.5)
 
 # ==========================================
 # 🎤 VOICE CHAT MONITORING
