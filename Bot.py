@@ -53,7 +53,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti Multi-Key AI Server Active!"
+    return f"M1-!-Kriti Bot Active! Telegram Connected: {bool(SESSION_STRING)}"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -77,7 +77,7 @@ def get_next_api_key():
     return selected_key
 
 # ==========================================
-# 💖 AI AUTO-REPLY (MULTI-KEY ROTATION)
+# 💖 AI AUTO-REPLY
 # ==========================================
 if client:
     @client.on(events.NewMessage(incoming=True))
@@ -93,12 +93,13 @@ if client:
             return
 
         if not GEMINI_KEYS:
-            await event.reply("Suno ji, pehle GEMINI_API_KEY set kar do na! 🔥😘")
+            await event.reply("Suno ji, Render mein GEMINI_API_KEY set nahi hai! 🔥😘")
             return
 
         sender_name = "Alex" if event.sender_id == 8871786114 else "EnZo"
         prompt_with_context = f"[{sender_name} says]: {user_text}"
 
+        reply_sent = False
         for _ in range(min(3, len(GEMINI_KEYS))):
             current_key = get_next_api_key()
             try:
@@ -112,10 +113,14 @@ if client:
                 response = await asyncio.to_thread(model.generate_content, prompt_with_context)
                 if response and response.text:
                     await event.reply(response.text)
-                    return
+                    reply_sent = True
+                    break
             except Exception as e:
                 print(f"API Key Error: {e}")
                 await asyncio.sleep(0.5)
+        
+        if not reply_sent:
+            await event.reply("Suno ji, saari API keys exhaust ho gayi ya error aa gaya! 🥵🫦")
 
 # ==========================================
 # 🎤 VOICE CHAT MONITORING
@@ -196,6 +201,10 @@ async def monitor_voice_chats():
 # 🚀 MAIN RUNNER
 # ==========================================
 async def main():
+    if not SESSION_STRING:
+        print(">>> ERROR: SESSION_STRING IS MISSING IN ENVIRONMENT VARIABLES! <<<")
+        return
+        
     if client:
         print("Connecting to Telegram Server...")
         await client.start()
