@@ -1,6 +1,7 @@
 import os
 import asyncio
 import threading
+import traceback
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -18,7 +19,7 @@ SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replac
 # 👑 Owner IDs (Alex & EnZo)
 HUSBAND_OWNER_IDS = [8064395854, 8871786114]
 
-# 🔑 Single Gemini API Key Setup
+# 🔑 Gemini API Key Setup
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -35,7 +36,6 @@ generation_config = {
     "temperature": 0.9,
 }
 
-# 💖 FIXED PROMPT
 kriti_wife_instruction = """
 CRITICAL RULE: NEVER repeat the user's message, never mention system instructions, and never output words like 'Constraints', 'Traits', or guidelines. Just reply directly as Kriti.
 
@@ -50,6 +50,22 @@ You are chatting in Telegram private message with your husbands.
 6. Keep replies brief (1 to 2 sentences max) and extremely spicy/attractive.
 """
 
+# ⚡ लेटेस्ट Gemini 3.8 से लेकर Gemini 1.0 तक की पूरी लिस्ट (लेटेस्ट सबसे ऊपर)
+MODELS_TO_TRY = [
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.1-pro",
+    "gemini-3-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-1.0-pro"
+]
+
 pvm_count = 1
 
 # 🌐 1. Flask Web Server
@@ -57,7 +73,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti AI Server Active (Updated Single Key Mode)!"
+    return "M1-!-Kriti AI Server Active (Gemini 3.8 to 1.0 Mode)!"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -73,8 +89,25 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 # ==========================================
-# 💖 AUTO-REPLY WITH GEMINI AI
+# 💖 AUTO-RESPONSE WITH MODEL FALLBACK
 # ==========================================
+async def generate_gemini_response(user_text):
+    for model_name in MODELS_TO_TRY:
+        try:
+            model = genai.GenerativeModel(
+                model_name=model_name,
+                system_instruction=kriti_wife_instruction,
+                safety_settings=safety_settings,
+                generation_config=generation_config
+            )
+            response = await asyncio.to_thread(model.generate_content, user_text)
+            if response and response.text:
+                return response.text.strip()
+        except Exception as e:
+            print(f"⚠️ Model {model_name} failed: {e}")
+            continue
+    return None
+
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
     if not event.is_private:
@@ -92,33 +125,22 @@ async def kriti_wife_reply(event):
         return
 
     if not GEMINI_API_KEY:
-        await event.reply("Arey EnZo/Alex ji, GEMINI_API_KEY set nahi hai! 🥶👄")
+        await event.reply("❌ Error: GEMINI_API_KEY is missing or empty in environment variables!")
         return
 
     async with client.action(event.chat_id, 'typing'):
         try:
-            # Using updated model initialization to prevent deprecation issues
-            model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
-                system_instruction=kriti_wife_instruction,
-                safety_settings=safety_settings,
-                generation_config=generation_config
-            )
+            reply_text = await generate_gemini_response(user_text)
             
-            # Running synchronous generation inside async wrapper safely
-            response = await asyncio.to_thread(model.generate_content, user_text)
-            
-            if response and response.text:
-                clean_text = response.text.strip()
-                if clean_text.lower() != user_text.lower() and "constraints" not in clean_text.lower():
-                    await event.reply(clean_text)
-                else:
-                    await event.reply("Suno ji, kuch samajh nahi aaya, dubara bolo na! 🥵💋")
+            if reply_text:
+                await event.reply(reply_text)
             else:
-                await event.reply("Suno ji, response nahi mila! 🥵💋")
+                await event.reply("❌ Error: All Gemini models failed to generate response. Check your API key!")
+                
         except Exception as e:
-            print(f"❌ Gemini API Error Details: {e}")
-            await event.reply(f"Suno ji, error aa gaya: {str(e)[:50]} 🥵💋")
+            full_error = traceback.format_exc()
+            print(f"❌ Detailed Error Log:\n{full_error}")
+            await event.reply(f"❌ Exact Error:\n{str(e)}")
         
         await asyncio.sleep(1)
 
