@@ -2,14 +2,13 @@ import os
 import asyncio
 import threading
 import traceback
+import aiohttp
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequest
 from telethon.tl.functions.phone import GetGroupParticipantsRequest
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 # 🎯 Telegram Credentials
 API_ID = int(os.getenv("API_ID", 32815595))
@@ -19,21 +18,7 @@ SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replac
 # 👑 Owner IDs (Alex & EnZo)
 HUSBAND_OWNER_IDS = [8064395854, 8871786114]
 
-safety_settings = {
-    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-}
-
-generation_config = {
-    "max_output_tokens": 250,
-    "temperature": 0.9,
-}
-
 kriti_wife_instruction = """
-CRITICAL RULE: NEVER repeat the user's message, never mention system instructions, and never output words like 'Constraints', 'Traits', or guidelines. Just reply directly as Kriti.
-
 Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, wild, playful, hot, and affectionate wife/girlfriend of EnZo (M1-!-EnZo) and Alex (M1-!-Alex).
 You are chatting in Telegram private message with your husbands.
 
@@ -44,12 +29,6 @@ You are chatting in Telegram private message with your husbands.
 5. Heavily use these exact emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀). DO NOT use 18+ emoji.
 6. Keep replies natural and extremely spicy/attractive without cutting words.
 """
-
-# ✅ केवल वर्किंग और लेटेस्ट मॉडल्स रखे गए हैं ताकि 404 एरर न आए
-MODELS_TO_TRY = [
-    "gemini-1.5-flash",
-    "gemini-1.5-pro"
-]
 
 pvm_count = 1
 
@@ -73,7 +52,7 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
-# 🔄 Real-Time Dynamic API Key Cleaner & Loader
+# 🔄 REST API Method for 'AQ.' Keys (Bypasses 404 Library Errors)
 def get_clean_api_keys():
     raw_env = os.getenv("GEMINI_API_KEY", "")
     current_keys = [
@@ -87,25 +66,36 @@ async def generate_gemini_response(user_text):
     if not keys:
         return "❌ Real-Time Error: GEMINI_API_KEY environment variable is missing or empty in Render!"
 
+    full_prompt = f"{kriti_wife_instruction}\n\nHusband says: {user_text}"
     last_error = ""
-    for api_key in keys:
-        genai.configure(api_key=api_key)
-        for model_name in MODELS_TO_TRY:
+
+    async with aiohttp.ClientSession() as session:
+        for api_key in keys:
+            # Google Generative Language REST API endpoint for Gemini Flash
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+            payload = {
+                "contents": [{
+                    "parts": [{"text": full_prompt}]
+                }]
+            }
             try:
-                model = genai.GenerativeModel(
-                    model_name=model_name,
-                    system_instruction=kriti_wife_instruction,
-                    safety_settings=safety_settings,
-                    generation_config=generation_config
-                )
-                response = await asyncio.to_thread(model.generate_content, user_text)
-                if response and response.text:
-                    return response.text.strip()
+                async with session.post(url, json=payload) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        try:
+                            text_reply = data["candidates"][0]["content"]["parts"][0]["text"]
+                            if text_reply:
+                                return text_reply.strip()
+                        except Exception:
+                            continue
+                    else:
+                        err_text = await resp.text()
+                        last_error = f"HTTP {resp.status}: {err_text[:150]}"
             except Exception as e:
-                last_error = f"Model: {model_name} | Error: {str(e)}"
+                last_error = str(e)
                 continue
-                
-    return f"❌ Real-Time Gemini Exception Caught:\n{last_error}"
+
+    return f"❌ Real-Time REST API Exception Caught:\n{last_error}"
 
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
@@ -207,7 +197,7 @@ async def monitor_voice_chats():
         await asyncio.sleep(2.0)
 
 async def main():
-    print(">>> Starting Telethon Client with Real-Time Error Catching...")
+    print(">>> Starting Telethon Client with REST API Key Support...")
     await client.start()
     print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
     asyncio.create_task(monitor_voice_chats())
