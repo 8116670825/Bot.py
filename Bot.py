@@ -36,11 +36,11 @@ Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, w
 You are chatting in Telegram private message with your husbands.
 
 CRITICAL INSTRUCTIONS:
-1. Speak ONLY in Hinglish (English alphabets writing Hindi language).
+1. Speak ONLY in pure Hinglish (Write Hindi sentences strictly using English alphabets/roman script like 'Aap kaise ho janu'). Do NOT use Devanagari Hindi script and do NOT use pure English.
 2. Reply to EVERY SINGLE MESSAGE sent by your husband regardless of what he says.
 3. Keep the conversation extremely loving, flirty, romantic, wild, naughty, and natural.
 4. Always refer to him as "EnZo", "Alex", "Janu", "Baby", "Suno ji", "Patidev", or "My Love".
-5. Heavily use these exact emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀). DO NOT use 18+ emoji.
+5. Heavily use these exact emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀).use 18+ emoji.
 6. Keep replies brief (1 to 2 sentences max) and extremely spicy/attractive.
 """
 
@@ -51,7 +51,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti Ultimate Multi-Key AI Server Active!"
+    return "M1-!-Kriti AI Server Active!"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -67,7 +67,7 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 # ==========================================
-# 💖 ROBUST MULTI-KEY ROTATION & AUTO-REPLY
+# 💖 AUTO-REPLY WITH AUTO-CLEANING API KEYS
 # ==========================================
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
@@ -83,27 +83,30 @@ async def kriti_wife_reply(event):
     if not user_text:
         return
 
-    # Render से सभी API कीज़ को फैमिलियर और क्लीन तरीके से फेच करना
     raw_env = os.getenv("GEMINI_API_KEY", "")
-    current_keys = [k.strip().replace('"', '').replace("'", "") for k in raw_env.split(",") if k.strip()]
+    # यहाँ पर स्पेस, न्यूलाइन और कोट्स को ऑटोमैटिक साफ किया जा रहा है
+    current_keys = [
+        k.replace(" ", "").replace("\n", "").replace("\r", "").replace('"', '').replace("'", "")
+        for k in raw_env.split(",") if k.strip()
+    ]
 
     if not current_keys:
         if event.sender_id in HUSBAND_OWNER_IDS:
-            await event.reply("Arey EnZo/Alex ji, Render me GEMINI_API_KEY dali hi nahi hai ya khali hai! 🥶👄")
+            await event.reply("Arey EnZo/Alex ji, GEMINI_API_KEY dali hi nahi hai ya khali hai! 🥶👄")
         return
 
     success = False
     reply_text = ""
     total_keys = len(current_keys)
 
-    # 🟢 टाइपिंग स्टेटस के साथ स्मार्ट की-स्विचिंग लूप
     async with client.action(event.chat_id, 'typing'):
-        for attempt in range(total_keys):
+        for _ in range(total_keys):
             selected_key = current_keys[key_index % total_keys]
+            key_index = (key_index + 1) % total_keys
             
             try:
-                # हर बार सही की के साथ मॉडल कॉन्फ़िगर करना
                 genai.configure(api_key=selected_key)
+                
                 model = genai.GenerativeModel(
                     model_name="gemini-1.5-flash",
                     system_instruction=kriti_wife_instruction,
@@ -114,13 +117,9 @@ async def kriti_wife_reply(event):
                 if response and response.text:
                     reply_text = response.text
                     success = True
-                    # सफलता मिलने पर अगली बार के लिए इंडेक्स बढ़ाएं और लूप तोड़ दें
-                    key_index = (key_index + 1) % total_keys
                     break
             except Exception as e:
-                print(f"⚠️ Key index {key_index % total_keys} failed. Trying next key. Error: {e}")
-                # फेल होने पर तुरंत अगली की पर मूव करो
-                key_index = (key_index + 1) % total_keys
+                print(f"❌ Gemini API Error with key: {e}")
                 continue
         
         await asyncio.sleep(1)
@@ -129,10 +128,10 @@ async def kriti_wife_reply(event):
         await event.reply(reply_text)
     else:
         if event.sender_id in HUSBAND_OWNER_IDS:
-            await event.reply("Suno ji, saari API keys exhaust ho गई या एरर आ गया! 🥵💋")
+            await event.reply("Suno ji, API Key load nahi ho pa rahi, logs check karo! 🥵💋")
 
 # ==========================================
-# 🎤 VOICE CHAT PREMIUM BANNER TASK
+# 🎤 VOICE CHAT MONITOR TASK
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count
@@ -206,7 +205,24 @@ async def monitor_voice_chats():
         await asyncio.sleep(2.0)
 
 async def main():
-    print(">>> Starting Telethon Client & Multi-Key Rotation Manager...")
+    print(">>> Checking Configuration...")
+    
+    if not SESSION_STRING:
+        print("❌ CRITICAL ERROR: SESSION_STRING is missing or empty!")
+    else:
+        print("✅ SESSION_STRING found.")
+
+    raw_env = os.getenv("GEMINI_API_KEY", "")
+    current_keys = [
+        k.replace(" ", "").replace("\n", "").replace("\r", "").replace('"', '').replace("'", "")
+        for k in raw_env.split(",") if k.strip()
+    ]
+    if not current_keys:
+        print("❌ CRITICAL ERROR: GEMINI_API_KEY is missing or empty!")
+    else:
+        print(f"✅ Loaded {len(current_keys)} Gemini API Key(s) successfully.")
+
+    print(">>> Starting Telethon Client...")
     await client.start()
     print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
     asyncio.create_task(monitor_voice_chats())
