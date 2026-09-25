@@ -14,7 +14,7 @@ API_ID = int(os.getenv("API_ID", 32815595))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
 SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replace("'", "")
 
-# 🔑 15 API Keys Handling (Comma Separated)
+# 🔑 API Keys Handling (Comma Separated)
 RAW_KEYS = os.getenv("GEMINI_API_KEY", "")
 GEMINI_KEYS = [k.strip() for k in RAW_KEYS.split(",") if k.strip()]
 key_index = 0
@@ -42,7 +42,7 @@ CRITICAL INSTRUCTIONS:
 1. Speak ONLY in Hinglish (English alphabets writing Hindi language).
 2. Always respond with cute, flirty, bold, and romantic intimacy to EVERY message.
 3. Address them lovingly as "Alex", "EnZo", "Baby", "Janu", "Suno ji", "Boss", or "My Love".
-4. Use emojis heavily ( 😘, 🙈, 💖, 🫀, ✨, 🔥 👙, 👻, 🥶, 🥵, 👄, 🫦).
+4. Use emojis heavily from this list only: (😘, 🙈, 💖, 🫀, ✨, 🔥, 👙, 👻, 🥶, 🥵, 👄, 🫦).
 5. Keep messages short, crisp (1-2 sentences), and super charming.
 """
 
@@ -60,7 +60,7 @@ def start_flask():
     app.run(host="0.0.0.0", port=port, use_reloader=False)
 
 # 🤖 Telegram Client Setup
-client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH) if SESSION_STRING else None
 
 BAN_RIGHTS = ChatBannedRights(
     until_date=None, view_messages=True, send_messages=True, send_media=True,
@@ -79,48 +79,51 @@ def get_next_api_key():
 # ==========================================
 # 💖 AI AUTO-REPLY (MULTI-KEY ROTATION)
 # ==========================================
-@client.on(events.NewMessage(incoming=True))
-async def kriti_wife_reply(event):
-    if not event.is_private:
-        return
+if client:
+    @client.on(events.NewMessage(incoming=True))
+    async def kriti_wife_reply(event):
+        if not event.is_private:
+            return
 
-    if event.sender_id not in OWNERS:
-        return
+        if event.sender_id not in OWNERS:
+            return
 
-    user_text = event.raw_text.strip()
-    if not user_text:
-        return
+        user_text = event.raw_text.strip()
+        if not user_text:
+            return
 
-    if not GEMINI_KEYS:
-        await event.reply("Suno ji, pehle GEMINI_API_KEY set kar do na! 🔥💋")
-        return
+        if not GEMINI_KEYS:
+            await event.reply("Suno ji, pehle GEMINI_API_KEY set kar do na! 🔥😘")
+            return
 
-    sender_name = "Alex" if event.sender_id == 8871786114 else "EnZo"
-    prompt_with_context = f"[{sender_name} says]: {user_text}"
+        sender_name = "Alex" if event.sender_id == 8871786114 else "EnZo"
+        prompt_with_context = f"[{sender_name} says]: {user_text}"
 
-    for _ in range(min(3, len(GEMINI_KEYS))):
-        current_key = get_next_api_key()
-        try:
-            genai.configure(api_key=current_key)
-            model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
-                system_instruction=kriti_wife_instruction,
-                safety_settings=safety_settings,
-                generation_config=generation_config
-            )
-            response = await asyncio.to_thread(model.generate_content, prompt_with_context)
-            if response and response.text:
-                await event.reply(response.text)
-                return
-        except Exception as e:
-            print(f"API Key Error: {e}")
-            await asyncio.sleep(0.5)
+        for _ in range(min(3, len(GEMINI_KEYS))):
+            current_key = get_next_api_key()
+            try:
+                genai.configure(api_key=current_key)
+                model = genai.GenerativeModel(
+                    model_name="gemini-1.5-flash",
+                    system_instruction=kriti_wife_instruction,
+                    safety_settings=safety_settings,
+                    generation_config=generation_config
+                )
+                response = await asyncio.to_thread(model.generate_content, prompt_with_context)
+                if response and response.text:
+                    await event.reply(response.text)
+                    return
+            except Exception as e:
+                print(f"API Key Error: {e}")
+                await asyncio.sleep(0.5)
 
 # ==========================================
 # 🎤 VOICE CHAT MONITORING
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count
+    if not client:
+        return
     await asyncio.sleep(5)
     me = await client.get_me()
     
@@ -168,7 +171,7 @@ async def monitor_voice_chats():
                                 user_str = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                message_text = f"""HELLO BABY, NIKAL DIYA HU 🔥
+                                message_text = f"""HELLO BABY, NIKAL DIYA HU 🔥🫦
 
 👤 **NAME:** {name_str}
 🔗 **USER:** {user_str}
@@ -193,11 +196,12 @@ async def monitor_voice_chats():
 # 🚀 MAIN RUNNER
 # ==========================================
 async def main():
-    print("Connecting to Telegram Server...")
-    await client.start()
-    print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
-    asyncio.create_task(monitor_voice_chats())
-    await client.run_until_disconnected()
+    if client:
+        print("Connecting to Telegram Server...")
+        await client.start()
+        print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
+        asyncio.create_task(monitor_voice_chats())
+        await client.run_until_disconnected()
 
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=start_flask, daemon=True)
