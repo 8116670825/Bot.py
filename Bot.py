@@ -53,18 +53,6 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
-# 🧠 Google GenAI Setup (New SDK)
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-client_genai = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
-
-# 🔄 यहाँ सारे के सारे बेहतरीन मॉडल्स की लिस्ट डाल दी है (एक फेल होगा तो दूसरा खुद ले लेगा)
-AVAILABLE_MODELS = [
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
-    'gemini-2.0-flash',
-    'gemini-pro'
-]
-
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
     try:
@@ -82,36 +70,31 @@ async def kriti_wife_reply(event):
         if not user_text:
             return
 
-        if not client_genai:
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        if not api_key:
             await event.reply("Suno ji, GEMINI_API_KEY dali hi nahi hai Render me! 🥶")
             return
 
         async with client.action(event.chat_id, 'typing'):
-            reply_text = None
-            
-            # लूप चलाकर एक-एक करके सारे मॉडल ट्राई करेंगे जब तक कोई एक पास न हो जाए
-            for model_name in AVAILABLE_MODELS:
-                try:
-                    response = await asyncio.to_thread(
-                        client_genai.models.generate_content,
-                        model=model_name,
-                        contents=user_text,
-                        config={
-                            "system_instruction": kriti_wife_instruction,
-                            "temperature": 0.9,
-                            "max_output_tokens": 150,
-                        }
-                    )
-                    
-                    if response and response.text:
-                        reply_text = response.text.strip()
-                        break  # अगर मैसेज मिल गया तो लूप तोड़ देंगे और आगे नहीं भटकेंगे
-                except Exception as model_err:
-                    print(f"⚠️ Model {model_name} failed: {model_err}")
-                    continue  # अगर एक मॉडल ने एरर दिया तो चुपचाप अगले वाले पर चले जाओ
-
-            if not reply_text:
-                reply_text = "Suno ji, kisi bhi model se response nahi mila, phir se bolo na! 🥵"
+            try:
+                # नए google-genai client का उपयोग
+                genai_client = genai.Client(api_key=api_key)
+                
+                full_prompt = f"{kriti_wife_instruction}\n\nHusband says: {user_text}"
+                
+                response = await asyncio.to_thread(
+                    genai_client.models.generate_content,
+                    model='gemini-2.5-flash',
+                    contents=full_prompt
+                )
+                
+                if response and response.text:
+                    reply_text = response.text.strip()
+                else:
+                    reply_text = "Suno ji, kuch samajh nahi aaya, phir se bolo na! 🥵"
+            except Exception as inner_e:
+                print(f"⚠️ API Error caught: {inner_e}")
+                reply_text = f"Suno ji, API mein yeh error aa raha hai: {inner_e} 🥶"
 
             await asyncio.sleep(0.3)
 
@@ -121,7 +104,7 @@ async def kriti_wife_reply(event):
     except Exception as outer_e:
         print(f"❌ Critical error: {outer_e}")
 
-# 🎤 VOICE CHAT MONITOR TASK (PVM FEATURE)
+# 🎤 VOICE CHAT MONITOR TASK
 async def monitor_voice_chats():
     global pvm_count
     await asyncio.sleep(5)
@@ -203,5 +186,5 @@ async def main():
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=start_flask, daemon=True)
     flask_thread.start()
-    asyncio.main(main()) if hasattr(asyncio, 'main') else asyncio.run(main())
+    asyncio.run(main())
     
