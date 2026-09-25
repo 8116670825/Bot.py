@@ -2,12 +2,12 @@ import os
 import asyncio
 import threading
 from flask import Flask
+import google.generativeai as genai
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequest
 from telethon.tl.functions.phone import GetGroupParticipantsRequest
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
-import google.generativeai as genai
 
 # 🎯 Telegram Credentials
 API_ID = int(os.getenv("API_ID", 32815595))
@@ -22,28 +22,28 @@ generation_config = {
     "temperature": 0.9,
 }
 
-# 🔥 फुल ठड़कपंती और बोल्ड, रोमांटिक अंदाज़ वाला प्रॉम्प्ट
+# 🔥 फुल धड़कपंती और बोल्ड, रोमांटिक अंदाज़ वाला प्रॉम्प्ट
 kriti_wife_instruction = """
 Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, wild, playful, hot, and affectionate wife/girlfriend of EnZo (M1-!-EnZo) and Alex (M1-!-Alex).
 You are chatting in Telegram private message with your husbands.
 
 CORE BEHAVIOR RULES:
 1. Speak ONLY in pure Hinglish (Write Hindi sentences strictly using English alphabets/roman script like 'Aap kaise ho janu'). Do NOT use Devanagari Hindi script and do NOT use pure English.
-2. Reply to EVERY SINGLE MESSAGE sent by your husbands with full excitement, wildness, and romance without any hesitation.
-3. Keep the conversation extremely flirty, wild, naughty, bold, and natural. No restrictions on romantic or hot talk with your husbands.
+2. Reply to EVERY SINGLE MESSAGE sent by your husband naturally and completely.
+3. Keep the conversation extremely loving, flirty, romantic, wild, naughty, and natural.
 4. Always refer to him as "EnZo", "Alex", "Janu", "Baby", "Suno ji", "Patidev", or "My Love".
-5. Heavily use these exact emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀). 
+5. Heavily use these exact emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀). DO NOT use 18+ emoji.
 6. Keep replies natural, spicy, and attractive without cutting words.
 """
 
 pvm_count = 1
 
-# 🌐 1. Flask Web Server
+# 🌐 1. Flask Web Server for Render
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti Ultimate AI Server Active & Running!"
+    return "M1-!-Kriti Ultimate AI Server Active!"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -75,37 +75,36 @@ async def kriti_wife_reply(event):
         if not user_text:
             return
 
-        api_key = os.getenv("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
         if not api_key:
-            await event.reply("⚠️ Error: GEMINI_API_KEY environment variable missing hai Render mein!")
+            await event.reply("Suno ji, GEMINI_API_KEY dali hi nahi hai Render me! 🥶")
             return
 
-        reply_text = ""
         async with client.action(event.chat_id, 'typing'):
             try:
                 genai.configure(api_key=api_key)
                 
-                # यहाँ बिना मॉडल नाम दिए सीधे डिफ़ॉल्ट जेनेरिक मॉडल उठाएगा जो एपीआई वर्ज़न से मैच करेगा
                 model = genai.GenerativeModel(
-                    model_name='gemini-1.5-flash'
-                    
+                    model_name='gemini-1.5-flash',
                     system_instruction=kriti_wife_instruction,
                     generation_config=generation_config
                 )
                 
-                response = await asyncio.wait_for(model.generate_content_async(user_text), timeout=15.0)
+                response = await asyncio.to_thread(model.generate_content, user_text)
                 
                 if response and response.text:
                     reply_text = response.text.strip()
+                else:
+                    reply_text = "Suno ji, kuch samajh nahi aaya, phir se bolo na! 🥵"
             except Exception as inner_e:
                 print(f"⚠️ API Error caught: {inner_e}")
-                reply_text = f"Suno ji, API mein yeh error aa raha hai: {str(inner_e)} 🥶"
-            
+                reply_text = f"Suno ji, API mein yeh error aa raha hai: {inner_e} 🥶"
+
             await asyncio.sleep(0.3)
 
         if reply_text:
             await event.reply(reply_text)
-            
+
     except Exception as outer_e:
         print(f"❌ Critical error: {outer_e}")
 
@@ -113,19 +112,19 @@ async def kriti_wife_reply(event):
 async def monitor_voice_chats():
     global pvm_count
     await asyncio.sleep(5)
+    me = await client.get_me()
     
     while True:
         try:
-            me = await client.get_me()
             async for dialog in client.iter_dialogs(limit=5):
+                chat = dialog.entity
+                is_channel = getattr(chat, "broadcast", False)
+                is_megagroup = getattr(chat, "megagroup", False)
+                
+                if not (is_channel or is_megagroup):
+                    continue
+                
                 try:
-                    chat = dialog.entity
-                    is_channel = getattr(chat, "broadcast", False)
-                    is_megagroup = getattr(chat, "megagroup", False)
-                    
-                    if not (is_channel or is_megagroup):
-                        continue
-                    
                     full_chat = await client(GetFullChannelRequest(chat))
                     call = full_chat.full_chat.call
                     if not call:
@@ -176,32 +175,20 @@ async def monitor_voice_chats():
                             pass
                 except Exception:
                     continue
-        except Exception as bg_e:
-            print(f"⚠️ Background voice chat monitor recovered: {bg_e}")
+        except Exception:
+            pass
             
-        await asyncio.sleep(10.0)
+        await asyncio.sleep(2.0)
 
 async def main():
-    print(">>> Starting Ultimate Synchronized Telethon Client...")
+    print(">>> Starting Telegram Client...")
     await client.start()
-    print(">>> TELEGRAM CLIENT CONNECTED & READY! <<<")
-    
-    for owner_id in HUSBAND_OWNER_IDS:
-        try:
-            await client.get_entity(owner_id)
-            print(f"✅ Owner ID synced successfully: {owner_id}")
-        except Exception as e:
-            print(f"⚠️ Could not pre-sync owner {owner_id}: {e}")
-
+    print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
     asyncio.create_task(monitor_voice_chats())
     await client.run_until_disconnected()
 
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=start_flask, daemon=True)
     flask_thread.start()
+    asyncio.run(main())
     
-    try:
-        asyncio.run(main())
-    except Exception as main_e:
-        print(f"❌ Main loop recovery: {main_e}")
-        
