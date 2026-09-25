@@ -57,7 +57,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti AI Server Active (Single Key Mode)!"
+    return "M1-!-Kriti AI Server Active (Updated Single Key Mode)!"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -73,7 +73,7 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 # ==========================================
-# 💖 AUTO-REPLY WITH SINGLE GEMINI KEY
+# 💖 AUTO-REPLY WITH GEMINI AI
 # ==========================================
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
@@ -97,13 +97,17 @@ async def kriti_wife_reply(event):
 
     async with client.action(event.chat_id, 'typing'):
         try:
+            # Using updated model initialization to prevent deprecation issues
             model = genai.GenerativeModel(
                 model_name="gemini-1.5-flash",
                 system_instruction=kriti_wife_instruction,
                 safety_settings=safety_settings,
                 generation_config=generation_config
             )
-            response = await model.generate_content_async(user_text)
+            
+            # Running synchronous generation inside async wrapper safely
+            response = await asyncio.to_thread(model.generate_content, user_text)
+            
             if response and response.text:
                 clean_text = response.text.strip()
                 if clean_text.lower() != user_text.lower() and "constraints" not in clean_text.lower():
@@ -113,8 +117,8 @@ async def kriti_wife_reply(event):
             else:
                 await event.reply("Suno ji, response nahi mila! 🥵💋")
         except Exception as e:
-            print(f"❌ Gemini API Error: {e}")
-            await event.reply("Suno ji, error aa gaya! 🥵💋")
+            print(f"❌ Gemini API Error Details: {e}")
+            await event.reply(f"Suno ji, error aa gaya: {str(e)[:50]} 🥵💋")
         
         await asyncio.sleep(1)
 
@@ -199,7 +203,7 @@ async def main():
     if not GEMINI_API_KEY:
         print("❌ CRITICAL ERROR: GEMINI_API_KEY is missing or empty!")
     else:
-        print("✅ GEMINI_API_KEY found.")
+        print("✅ GEMINI_API_KEY found and configured.")
 
     print(">>> Starting Telethon Client...")
     await client.start()
