@@ -17,11 +17,11 @@ SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replac
 
 # 👑 Owner IDs (Alex & EnZo)
 HUSBAND_OWNER_IDS = [8064395854, 8871786114]
-key_index = 0
 
-# 🔑 Render के Environment Variable से ऑटोमैटिक सभी 15 कीज़ उठाएगा (GitHub कभी ब्लॉक नहीं करेगा)
-RAW_GEMINI_KEYS = os.getenv("GEMINI_API_KEY", "")
-GEMINI_KEYS_POOL = [k.strip().replace('"', '').replace("'", "") for k in RAW_GEMINI_KEYS.split(",") if k.strip()]
+# 🔑 Single Gemini API Key Setup
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 safety_settings = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
@@ -57,7 +57,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return f"M1-!-Kriti AI Server Active! Loaded Keys: {len(GEMINI_KEYS_POOL)}"
+    return "M1-!-Kriti AI Server Active (Single Key Mode)!"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -72,17 +72,11 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
-GEMINI_MODELS_POOL = [
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-]
-
 # ==========================================
-# 💖 AUTO-REPLY WITH BUILT-IN MULTI-KEYS POOL
+# 💖 AUTO-REPLY WITH SINGLE GEMINI KEY
 # ==========================================
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
-    global key_index
     if not event.is_private:
         return
 
@@ -97,47 +91,32 @@ async def kriti_wife_reply(event):
     if not user_text:
         return
 
-    if not GEMINI_KEYS_POOL:
-        await event.reply("Arey EnZo/Alex ji, Render me GEMINI_API_KEY dali hi nahi hai ya khali hai! 🥶👄")
+    if not GEMINI_API_KEY:
+        await event.reply("Arey EnZo/Alex ji, GEMINI_API_KEY set nahi hai! 🥶👄")
         return
 
-    success = False
-    reply_text = ""
-    total_keys = len(GEMINI_KEYS_POOL)
-
     async with client.action(event.chat_id, 'typing'):
-        for _ in range(total_keys):
-            selected_key = GEMINI_KEYS_POOL[key_index % total_keys]
-            key_index = (key_index + 1) % total_keys
-            
-            for model_name in GEMINI_MODELS_POOL:
-                try:
-                    genai.configure(api_key=selected_key)
-                    model = genai.GenerativeModel(
-                        model_name=model_name,
-                        system_instruction=kriti_wife_instruction,
-                        safety_settings=safety_settings,
-                        generation_config=generation_config
-                    )
-                    response = await model.generate_content_async(user_text)
-                    if response and response.text:
-                        clean_text = response.text.strip()
-                        if clean_text.lower() != user_text.lower() and "constraints" not in clean_text.lower():
-                            reply_text = clean_text
-                            success = True
-                            break
-                except Exception as e:
-                    print(f"❌ Gemini API Error with model {model_name}: {e}")
-                    continue
-            if success:
-                break
+        try:
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-flash",
+                system_instruction=kriti_wife_instruction,
+                safety_settings=safety_settings,
+                generation_config=generation_config
+            )
+            response = await model.generate_content_async(user_text)
+            if response and response.text:
+                clean_text = response.text.strip()
+                if clean_text.lower() != user_text.lower() and "constraints" not in clean_text.lower():
+                    await event.reply(clean_text)
+                else:
+                    await event.reply("Suno ji, kuch samajh nahi aaya, dubara bolo na! 🥵💋")
+            else:
+                await event.reply("Suno ji, response nahi mila! 🥵💋")
+        except Exception as e:
+            print(f"❌ Gemini API Error: {e}")
+            await event.reply("Suno ji, error aa gaya! 🥵💋")
         
         await asyncio.sleep(1)
-
-    if success and reply_text:
-        await event.reply(reply_text)
-    else:
-        await event.reply("Suno ji, saari API keys exhaust ho gayi ya error aa gaya! 🥵💋")
 
 # ==========================================
 # 🎤 VOICE CHAT MONITOR TASK
@@ -217,10 +196,11 @@ async def main():
     print(">>> Checking Configuration...")
     if not SESSION_STRING:
         print("❌ CRITICAL ERROR: SESSION_STRING is missing or empty!")
+    if not GEMINI_API_KEY:
+        print("❌ CRITICAL ERROR: GEMINI_API_KEY is missing or empty!")
     else:
-        print("✅ SESSION_STRING found.")
+        print("✅ GEMINI_API_KEY found.")
 
-    print(f"✅ Loaded {len(GEMINI_KEYS_POOL)} Gemini API Key(s) from Environment Variables.")
     print(">>> Starting Telethon Client...")
     await client.start()
     print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
@@ -231,4 +211,4 @@ if __name__ == "__main__":
     flask_thread = threading.Thread(target=start_flask, daemon=True)
     flask_thread.start()
     asyncio.run(main())
-                    
+    
