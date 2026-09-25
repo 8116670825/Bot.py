@@ -11,7 +11,7 @@ import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 # Telegram Credentials
-API_ID = int(os.getenv("API_ID", 32815595))
+API_ID = int(os.getenv("API_ID", "32815595"))
 API_HASH = os.getenv("API_HASH", "4f8710ec9e88946139ac688af9eb1f5b")
 SESSION_STRING = os.getenv("SESSION_STRING", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
@@ -22,7 +22,7 @@ HUSBAND_OWNER_IDS = [8064395854, 7862705353]
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# Safety Settings: Fully Unfiltered / No Restrictions
+# Safety Settings
 safety_settings = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -49,11 +49,17 @@ CRITICAL INSTRUCTIONS:
 """
 
 pvm_count = 1
+
+# Flask Web Application for Render Health Check
 app = Flask(__name__)
 
 @app.route("/")
 def home():
     return "M1-!-Kriti Hot AI Userbot is Running!"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port, use_reloader=False)
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
@@ -64,7 +70,7 @@ BAN_RIGHTS = ChatBannedRights(
 )
 
 # ==========================================
-# 💖 ALL MESSAGES AI AUTO-REPLY (HOT & UNFILTERED)
+# 💖 ALL MESSAGES AI AUTO-REPLY
 # ==========================================
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
@@ -84,26 +90,32 @@ async def kriti_wife_reply(event):
             await event.reply("Arey EnZo ji, pehle GEMINI_API_KEY set kar do na! 🔥💋🫦")
         return
 
-    try:
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=kriti_wife_instruction,
-            safety_settings=safety_settings,
-            generation_config=generation_config
-        )
-        
-        response = model.generate_content(user_text)
+    def generate_response():
+        try:
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-flash",
+                system_instruction=kriti_wife_instruction,
+                safety_settings=safety_settings,
+                generation_config=generation_config
+            )
+            res = model.generate_content(user_text)
+            if res and res.text:
+                return res.text
+        except Exception as e:
+            print(f"Gemini Error: {e}")
+        return None
 
-        if response and response.text:
-            await event.reply(response.text)
-    except Exception as e:
-        print(f"Error in reply: {e}")
+    # Sync API Call ko Async Thread pool mein run karne ke liye
+    reply_text = await asyncio.to_thread(generate_response)
+    if reply_text:
+        await event.reply(reply_text)
 
 # ==========================================
 # 🎤 VOICE CHAT PREMIUM BANNER TASK
 # ==========================================
 async def monitor_voice_chats():
     global pvm_count
+    await asyncio.sleep(5)  # Telegram Connect hone ka wait
     me = await client.get_me()
     
     while True:
@@ -154,7 +166,6 @@ async def monitor_voice_chats():
                                 user_str = f"@{user.username}" if user.username else "None"
                                 uid = user.id
                                 
-                                # ⚡ एकदम शॉर्ट और क्लीन मैसेज ⚡
                                 message_text = f"""HELLO BABY, NIKAL DIYA HU 🔥
 
 👤 **NAME:** {name_str}
@@ -162,13 +173,12 @@ async def monitor_voice_chats():
 🆔 `{uid}`
 📊 **TOTAL:** {pvm_count}"""
 
-                                try:
-                                    # दोनों हस्बैंड आईडी पर मैसेज भेजेगा
-                                    for owner_id in HUSBAND_OWNER_IDS:
+                                for owner_id in HUSBAND_OWNER_IDS:
+                                    try:
                                         await client.send_message(owner_id, message_text)
-                                    pvm_count += 1
-                                except Exception:
-                                    pass
+                                    except Exception:
+                                        pass
+                                pvm_count += 1
 
                         except Exception:
                             pass
@@ -181,22 +191,23 @@ async def monitor_voice_chats():
             
         await asyncio.sleep(2.0)
 
-async def start_bot():
+async def main():
     print(">>> Starting Telethon Client...")
     await client.start()
-    print(">>> Telethon Client Connected Successfully!")
+    print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
+    
+    # Background task for Voice Chat Monitor
     asyncio.create_task(monitor_voice_chats())
+    
+    # Run Telethon event loop
     await client.run_until_disconnected()
 
-def run_telethon():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(start_bot())
-
 if __name__ == "__main__":
-    t = threading.Thread(target=run_telethon, daemon=True)
+    # Flask app runs in background thread
+    t = threading.Thread(target=run_flask)
+    t.daemon = True
     t.start()
     
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    # Main thread handles Asyncio Event Loop
+    asyncio.run(main())
     
