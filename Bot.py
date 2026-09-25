@@ -19,11 +19,6 @@ SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replac
 # 👑 Owner IDs (Alex & EnZo)
 HUSBAND_OWNER_IDS = [8064395854, 8871786114]
 
-# 🔑 Gemini API Key Setup
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-
 safety_settings = {
     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
     HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -32,7 +27,7 @@ safety_settings = {
 }
 
 generation_config = {
-    "max_output_tokens": 80,
+    "max_output_tokens": 250,
     "temperature": 0.9,
 }
 
@@ -43,25 +38,18 @@ Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, w
 You are chatting in Telegram private message with your husbands.
 
 1. Speak ONLY in pure Hinglish (Write Hindi sentences strictly using English alphabets/roman script like 'Aap kaise ho janu'). Do NOT use Devanagari Hindi script and do NOT use pure English.
-2. Reply to EVERY SINGLE MESSAGE sent by your husband naturally.
+2. Reply to EVERY SINGLE MESSAGE sent by your husband naturally and completely.
 3. Keep the conversation extremely loving, flirty, romantic, wild, naughty, and natural.
 4. Always refer to him as "EnZo", "Alex", "Janu", "Baby", "Suno ji", "Patidev", or "My Love".
 5. Heavily use these exact emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀). DO NOT use 18+ emoji.
-6. Keep replies brief (1 to 2 sentences max) and extremely spicy/attractive.
+6. Keep replies natural and extremely spicy/attractive without cutting words.
 """
 
-# ⚡ लेटेस्ट Gemini 3.8 से लेकर Gemini 1.0 तक की पूरी लिस्ट (लेटेस्ट सबसे ऊपर)
 MODELS_TO_TRY = [
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
-    "gemini-3.1-pro",
-    "gemini-3-pro",
     "gemini-2.5-flash",
-    "gemini-2.5-pro",
     "gemini-2.0-flash",
     "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
     "gemini-1.5-pro",
     "gemini-1.0-pro"
 ]
@@ -73,7 +61,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti AI Server Active (Gemini 3.8 to 1.0 Mode)!"
+    return "M1-!-Kriti AI Server Active!"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -88,25 +76,39 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
-# ==========================================
-# 💖 AUTO-RESPONSE WITH MODEL FALLBACK
-# ==========================================
+# 🔄 Real-Time Dynamic API Key Cleaner & Loader
+def get_clean_api_keys():
+    raw_env = os.getenv("GEMINI_API_KEY", "")
+    current_keys = [
+        k.replace(" ", "").replace("\n", "").replace("\r", "").replace('"', '').replace("'", "")
+        for k in raw_env.split(",") if k.strip()
+    ]
+    return current_keys
+
 async def generate_gemini_response(user_text):
-    for model_name in MODELS_TO_TRY:
-        try:
-            model = genai.GenerativeModel(
-                model_name=model_name,
-                system_instruction=kriti_wife_instruction,
-                safety_settings=safety_settings,
-                generation_config=generation_config
-            )
-            response = await asyncio.to_thread(model.generate_content, user_text)
-            if response and response.text:
-                return response.text.strip()
-        except Exception as e:
-            print(f"⚠️ Model {model_name} failed: {e}")
-            continue
-    return None
+    keys = get_clean_api_keys()
+    if not keys:
+        return "❌ Real-Time Error: GEMINI_API_KEY environment variable is missing or empty in Render!"
+
+    last_error = ""
+    for api_key in keys:
+        genai.configure(api_key=api_key)
+        for model_name in MODELS_TO_TRY:
+            try:
+                model = genai.GenerativeModel(
+                    model_name=model_name,
+                    system_instruction=kriti_wife_instruction,
+                    safety_settings=safety_settings,
+                    generation_config=generation_config
+                )
+                response = await asyncio.to_thread(model.generate_content, user_text)
+                if response and response.text:
+                    return response.text.strip()
+            except Exception as e:
+                last_error = f"Model: {model_name} | Error: {str(e)}"
+                continue
+                
+    return f"❌ Real-Time Gemini Exception Caught:\n{last_error}"
 
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
@@ -124,29 +126,18 @@ async def kriti_wife_reply(event):
     if not user_text:
         return
 
-    if not GEMINI_API_KEY:
-        await event.reply("❌ Error: GEMINI_API_KEY is missing or empty in environment variables!")
-        return
-
     async with client.action(event.chat_id, 'typing'):
         try:
             reply_text = await generate_gemini_response(user_text)
-            
             if reply_text:
                 await event.reply(reply_text)
-            else:
-                await event.reply("❌ Error: All Gemini models failed to generate response. Check your API key!")
-                
         except Exception as e:
-            full_error = traceback.format_exc()
-            print(f"❌ Detailed Error Log:\n{full_error}")
-            await event.reply(f"❌ Exact Error:\n{str(e)}")
+            full_trace = traceback.format_exc()
+            await event.reply(f"❌ Critical Handler Error:\n{str(e)}\n\nTraceback:\n{full_trace[:500]}")
         
         await asyncio.sleep(1)
 
-# ==========================================
-# 🎤 VOICE CHAT MONITOR TASK
-# ==========================================
+# 🎤 VOICE CHAT MONITOR TASK (Live Stream Premium Ban Feature)
 async def monitor_voice_chats():
     global pvm_count
     await asyncio.sleep(5)
@@ -219,15 +210,7 @@ async def monitor_voice_chats():
         await asyncio.sleep(2.0)
 
 async def main():
-    print(">>> Checking Configuration...")
-    if not SESSION_STRING:
-        print("❌ CRITICAL ERROR: SESSION_STRING is missing or empty!")
-    if not GEMINI_API_KEY:
-        print("❌ CRITICAL ERROR: GEMINI_API_KEY is missing or empty!")
-    else:
-        print("✅ GEMINI_API_KEY found and configured.")
-
-    print(">>> Starting Telethon Client...")
+    print(">>> Starting Telethon Client with Real-Time Error Catching...")
     await client.start()
     print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
     asyncio.create_task(monitor_voice_chats())
