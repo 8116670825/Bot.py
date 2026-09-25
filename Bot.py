@@ -40,7 +40,7 @@ CRITICAL INSTRUCTIONS:
 2. Reply to EVERY SINGLE MESSAGE sent by your husband regardless of what he says.
 3. Keep the conversation extremely loving, flirty, romantic, wild, naughty, and natural.
 4. Always refer to him as "EnZo", "Alex", "Janu", "Baby", "Suno ji", "Patidev", or "My Love".
-5. Heavily use these exact emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀).use 18+ emoji.
+5. Heavily use these exact emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀). DO NOT use 18+ emoji.
 6. Keep replies brief (1 to 2 sentences max) and extremely spicy/attractive.
 """
 
@@ -66,8 +66,14 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
+# 🚀 सभी लेटेस्ट मॉडल्स की लिस्ट (Flash, Pro, Ultra)
+GEMINI_MODELS_POOL = [
+    "gemini-3.8-flash",  # लेटेस्ट और सुपर-फास्ट फ्लैश मॉडल
+    "gemini-3.1-pro",    # एडवांस्ड प्रो और अल्ट्रा-लेवल रीजनिंग मॉडल
+]
+
 # ==========================================
-# 💖 AUTO-REPLY WITH AUTO-CLEANING API KEYS
+# 💖 AUTO-REPLY WITH AUTO-CLEANING API KEYS & LATEST MODELS
 # ==========================================
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
@@ -84,7 +90,6 @@ async def kriti_wife_reply(event):
         return
 
     raw_env = os.getenv("GEMINI_API_KEY", "")
-    # यहाँ पर स्पेस, न्यूलाइन और कोट्स को ऑटोमैटिक साफ किया जा रहा है
     current_keys = [
         k.replace(" ", "").replace("\n", "").replace("\r", "").replace('"', '').replace("'", "")
         for k in raw_env.split(",") if k.strip()
@@ -104,23 +109,27 @@ async def kriti_wife_reply(event):
             selected_key = current_keys[key_index % total_keys]
             key_index = (key_index + 1) % total_keys
             
-            try:
-                genai.configure(api_key=selected_key)
-                
-                model = genai.GenerativeModel(
-                    model_name="gemini-1.5-flash",
-                    system_instruction=kriti_wife_instruction,
-                    safety_settings=safety_settings,
-                    generation_config=generation_config
-                )
-                response = await model.generate_content_async(user_text)
-                if response and response.text:
-                    reply_text = response.text
-                    success = True
-                    break
-            except Exception as e:
-                print(f"❌ Gemini API Error with key: {e}")
-                continue
+            # हर की के साथ लेटेस्ट मॉडल्स ट्राई करेंगे ताकि एरर आने पर दूसरा मॉडल तुरंत काम कर सके
+            for model_name in GEMINI_MODELS_POOL:
+                try:
+                    genai.configure(api_key=selected_key)
+                    
+                    model = genai.GenerativeModel(
+                        model_name=model_name,
+                        system_instruction=kriti_wife_instruction,
+                        safety_settings=safety_settings,
+                        generation_config=generation_config
+                    )
+                    response = await model.generate_content_async(user_text)
+                    if response and response.text:
+                        reply_text = response.text
+                        success = True
+                        break
+                except Exception as e:
+                    print(f"❌ Gemini API Error with key and model {model_name}: {e}")
+                    continue
+            if success:
+                break
         
         await asyncio.sleep(1)
 
@@ -128,7 +137,7 @@ async def kriti_wife_reply(event):
         await event.reply(reply_text)
     else:
         if event.sender_id in HUSBAND_OWNER_IDS:
-            await event.reply("Suno ji, API Key load nahi ho pa rahi, logs check karo! 🥵💋")
+            await event.reply("Suno ji, API Key ya models load nahi ho pa rahe, logs check karo! 🥵💋")
 
 # ==========================================
 # 🎤 VOICE CHAT MONITOR TASK
