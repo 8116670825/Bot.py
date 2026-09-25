@@ -1,13 +1,14 @@
 import os
 import asyncio
 import threading
-import requests
 from flask import Flask
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import EditBannedRequest, GetFullChannelRequest
 from telethon.tl.functions.phone import GetGroupParticipantsRequest
 from telethon.tl.types import ChatBannedRights, ChannelParticipantsAdmins
+import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 # 🎯 Telegram Credentials
 API_ID = int(os.getenv("API_ID", 32815595))
@@ -18,16 +19,31 @@ SESSION_STRING = os.getenv("SESSION_STRING", "").strip().replace('"', '').replac
 HUSBAND_OWNER_IDS = [8064395854, 8871786114]
 key_index = 0
 
+safety_settings = {
+    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+}
+
+generation_config = {
+    "max_output_tokens": 80,
+    "temperature": 0.9,
+}
+
 kriti_wife_instruction = """
+CRITICAL RULE: NEVER repeat the user's message, never mention system instructions, and never output words like 'Constraints', 'Traits', or guidelines. Just reply directly as Kriti.
+
 Your name is Kriti (M1-!-Kriti). You are the extremely loving, romantic, bold, wild, playful, hot, and affectionate wife/girlfriend of EnZo (M1-!-EnZo) and Alex (M1-!-Alex).
 You are chatting in Telegram private message with your husbands.
 
+CRITICAL INSTRUCTIONS:
 1. Speak ONLY in pure Hinglish (Write Hindi sentences strictly using English alphabets/roman script like 'Aap kaise ho janu'). Do NOT use Devanagari Hindi script and do NOT use pure English.
-2. Reply to EVERY SINGLE MESSAGE sent by your husband naturally and completely.
+2. Reply to EVERY SINGLE MESSAGE sent by your husband naturally.
 3. Keep the conversation extremely loving, flirty, romantic, wild, naughty, and natural.
 4. Always refer to him as "EnZo", "Alex", "Janu", "Baby", "Suno ji", "Patidev", or "My Love".
 5. Heavily use these exact emojis (🥶, 👄, 🫦, 🤤, 🥵, 💋, 💦, 👙, 😘, 🙈, 💖, 🫀, 👀). DO NOT use 18+ emoji.
-6. Keep replies natural and extremely spicy/attractive without cutting words.
+6. Keep replies brief (1 to 2 sentences max) and extremely spicy/attractive.
 """
 
 pvm_count = 1
@@ -37,7 +53,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "M1-!-Kriti Direct API Server Active!"
+    return "M1-!-Kriti AI Server Active!"
 
 def start_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -52,56 +68,12 @@ BAN_RIGHTS = ChatBannedRights(
     embed_links=True, send_polls=True, change_info=False, invite_users=False, pin_messages=False
 )
 
-def get_clean_api_keys():
-    raw_env = os.getenv("GEMINI_API_KEY", "")
-    current_keys = [
-        k.replace(" ", "").replace("\n", "").replace("\r", "").replace('"', '').replace("'", "")
-        for k in raw_env.split(",") if k.strip()
-    ]
-    return current_keys
-
-# 🚀 Direct HTTP REST API Method for new AQ keys
-def call_gemini_rest(user_text):
-    global key_index
-    keys = get_clean_api_keys()
-    if not keys:
-        return "Arey EnZo/Alex ji, GEMINI_API_KEY dali hi nahi hai Render me! 🥶"
-
-    total_keys = len(keys)
-    for _ in range(total_keys):
-        selected_key = keys[key_index % total_keys]
-        key_index = (key_index + 1) % total_keys
-
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={selected_key}"
-        
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": f"System Instruction: {kriti_wife_instruction}\n\nHusband says: {user_text}"}
-                    ]
-                }
-            ]
-        }
-        
-        try:
-            response = requests.post(url, json=payload, timeout=10)
-            if response.status_code == 200:
-                res_json = response.json()
-                candidate = res_json.get("candidates", [])[0]
-                reply_text = candidate.get("content", {}).get("parts", [])[0].get("text", "")
-                if reply_text:
-                    return reply_text.strip()
-            else:
-                print(f"API Error with key: {response.text}")
-        except Exception as e:
-            print(f"Request exception: {e}")
-            continue
-
-    return "Suno ji, saari API keys exhaust ho gayi ya error aa gaya! 🥵💋"
-
+# ==========================================
+# 💖 AUTO-REPLY WITH AQ KEY SUPPORT
+# ==========================================
 @client.on(events.NewMessage(incoming=True))
 async def kriti_wife_reply(event):
+    global key_index
     if not event.is_private:
         return
 
@@ -109,22 +81,57 @@ async def kriti_wife_reply(event):
     if event.sender_id == me.id:
         return
 
-    if event.sender_id not in HUSBAND_OWNER_IDS:
-        return
-
     user_text = event.raw_text.strip()
     if not user_text:
         return
 
+    raw_env = os.getenv("GEMINI_API_KEY", "")
+    current_keys = [k.strip().replace('"', '').replace("'", "") for k in raw_env.split(",") if k.strip()]
+
+    if not current_keys:
+        if event.sender_id in HUSBAND_OWNER_IDS:
+            await event.reply("Arey EnZo/Alex ji, Render me GEMINI_API_KEY dali hi nahi hai ya khali hai! 🥶👄")
+        return
+
+    success = False
+    reply_text = ""
+    total_keys = len(current_keys)
+
     async with client.action(event.chat_id, 'typing'):
-        # Run synchronous requests in async thread to prevent blocking
-        reply_text = await asyncio.to_thread(call_gemini_rest, user_text)
+        for _ in range(total_keys):
+            selected_key = current_keys[key_index % total_keys]
+            key_index = (key_index + 1) % total_keys
+            
+            try:
+                os.environ["GEMINI_API_KEY"] = selected_key
+                genai.configure(api_key=selected_key)
+                
+                model = genai.GenerativeModel(
+                    model_name="gemini-1.5-flash",
+                    system_instruction=kriti_wife_instruction,
+                    safety_settings=safety_settings,
+                    generation_config=generation_config
+                )
+                response = await model.generate_content_async(user_text)
+                if response and response.text:
+                    reply_text = response.text
+                    success = True
+                    break
+            except Exception as e:
+                print(f"❌ Gemini API Error: {e}")
+                continue
+        
         await asyncio.sleep(1)
 
-    if reply_text:
+    if success and reply_text:
         await event.reply(reply_text)
+    else:
+        if event.sender_id in HUSBAND_OWNER_IDS:
+            await event.reply("Suno ji, API Key load nahi ho pa rahi, Render logs check karo! 🥵💋")
 
+# ==========================================
 # 🎤 VOICE CHAT MONITOR TASK
+# ==========================================
 async def monitor_voice_chats():
     global pvm_count
     await asyncio.sleep(5)
@@ -197,7 +204,7 @@ async def monitor_voice_chats():
         await asyncio.sleep(2.0)
 
 async def main():
-    print(">>> Starting Telethon Client with Direct REST API...")
+    print(">>> Starting Telethon Client & Fixed Key Handler...")
     await client.start()
     print(">>> TELEGRAM CLIENT CONNECTED SUCCESSFULLY! <<<")
     asyncio.create_task(monitor_voice_chats())
