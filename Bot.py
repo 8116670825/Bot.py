@@ -85,8 +85,9 @@ async def kriti_wife_reply(event):
             try:
                 genai.configure(api_key=api_key)
                 
+                # यहाँ एकदम सही और लेटेस्ट मॉडल नाम सेट कर दिया है
                 model = genai.GenerativeModel(
-                    model_name='gemini-pro',
+                    model_name='gemini-1.5-flash',
                     system_instruction=kriti_wife_instruction,
                     generation_config=generation_config
                 )
